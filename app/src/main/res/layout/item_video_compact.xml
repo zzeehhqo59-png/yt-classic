@@ -1,18 +1,20 @@
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android" android:layout_width="match_parent" android:layout_height="wrap_content"
     android:orientation="horizontal" android:background="?attr/selectableItemBackground" android:paddingStart="12dp" android:paddingTop="6dp" android:paddingBottom="6dp">
   <FrameLayout android:layout_width="160dp" android:layout_height="90dp">
-    <ImageView android:id="@+id/thumb" android:layout_width="match_parent" android:layout_height="match_parent" android:scaleType="centerCrop" android:background="#E0E0E0" android:importantForAccessibility="no"/>
+    <ImageView android:id="@+id/thumb" android:layout_width="match_parent" android:layout_height="match_parent" android:scaleType="centerCrop" android:background="@color/placeholder" android:importantForAccessibility="no"/>
     <TextView android:id="@+id/duration" android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_gravity="bottom|end"
         android:layout_margin="4dp" android:background="@drawable/bg_duration" android:paddingStart="4dp" android:paddingEnd="4dp"
         android:textColor="#FFFFFF" android:textSize="12sp" android:textStyle="bold"/>
+    <ProgressBar android:id="@+id/watched" style="?android:attr/progressBarStyleHorizontal" android:layout_width="match_parent" android:layout_height="3dp"
+        android:layout_gravity="bottom" android:progressTint="#FF0000" android:progressBackgroundTint="#80FFFFFF" android:max="1000" android:visibility="gone"/>
   </FrameLayout>
   <LinearLayout android:layout_width="0dp" android:layout_weight="1" android:layout_height="wrap_content" android:orientation="vertical" android:layout_marginStart="12dp">
     <TextView android:id="@+id/title" android:layout_width="match_parent" android:layout_height="wrap_content" android:maxLines="2" android:ellipsize="end"
-        android:textColor="#0F0F0F" android:textSize="14sp"/>
+        android:textColor="@color/text1" android:textSize="14sp"/>
     <TextView android:id="@+id/channel" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="4dp" android:maxLines="1" android:ellipsize="end"
-        android:textColor="#606060" android:textSize="12sp"/>
+        android:textColor="@color/text2" android:textSize="12sp"/>
     <TextView android:id="@+id/meta" android:layout_width="match_parent" android:layout_height="wrap_content" android:maxLines="1" android:ellipsize="end"
-        android:textColor="#606060" android:textSize="12sp"/>
+        android:textColor="@color/text2" android:textSize="12sp"/>
   </LinearLayout>
-  <ImageView android:layout_width="40dp" android:layout_height="40dp" android:padding="10dp" android:src="@drawable/ic_more_vert" android:contentDescription="@string/more"/>
+  <ImageView android:id="@+id/more" android:background="?attr/selectableItemBackgroundBorderless" android:layout_width="40dp" android:layout_height="40dp" android:padding="10dp" android:src="@drawable/ic_more_vert" android:contentDescription="@string/more"/>
 </LinearLayout>

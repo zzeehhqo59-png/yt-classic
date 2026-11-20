@@ -1,16 +1,20 @@
-<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android" android:id="@+id/root" android:layout_width="match_parent" android:layout_height="match_parent" android:orientation="vertical" android:background="#FFFFFF">
-  <LinearLayout android:layout_width="match_parent" android:layout_height="48dp" android:orientation="horizontal" android:gravity="center_vertical" android:background="#FFFFFF" android:elevation="4dp">
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android" android:id="@+id/root" android:layout_width="match_parent" android:layout_height="match_parent" android:orientation="vertical" android:background="@color/bg">
+  <LinearLayout android:layout_width="match_parent" android:layout_height="48dp" android:orientation="horizontal" android:gravity="center_vertical" android:background="@color/bg" android:elevation="4dp">
     <ImageButton android:id="@+id/btnBack" android:layout_width="48dp" android:layout_height="48dp" android:background="?attr/selectableItemBackgroundBorderless" android:src="@drawable/ic_back" android:contentDescription="@string/back"/>
     <EditText android:id="@+id/query" android:layout_width="0dp" android:layout_weight="1" android:layout_height="match_parent" android:background="@null"
-        android:hint="@string/search_hint" android:textColorHint="#909090" android:textColor="#0F0F0F" android:textSize="16sp"
+        android:hint="@string/search_hint" android:textColorHint="@color/text3" android:textColor="@color/text1" android:textSize="16sp"
         android:imeOptions="actionSearch" android:inputType="text" android:maxLines="1" android:importantForAutofill="no"/>
     <ImageButton android:id="@+id/btnClear" android:layout_width="48dp" android:layout_height="48dp" android:background="?attr/selectableItemBackgroundBorderless" android:src="@drawable/ic_close" android:contentDescription="@string/clear" android:visibility="gone"/>
   </LinearLayout>
+  <HorizontalScrollView android:id="@+id/filterBar" android:layout_width="match_parent" android:layout_height="wrap_content" android:scrollbars="none" android:visibility="gone">
+    <com.google.android.material.chip.ChipGroup android:id="@+id/chips" android:layout_width="wrap_content" android:layout_height="wrap_content"
+        android:paddingStart="12dp" android:paddingEnd="12dp" app:singleSelection="true" app:selectionRequired="true" app:singleLine="true" xmlns:app="http://schemas.android.com/apk/res-auto"/>
+  </HorizontalScrollView>
   <FrameLayout android:layout_width="match_parent" android:layout_height="0dp" android:layout_weight="1">
     <androidx.recyclerview.widget.RecyclerView android:id="@+id/results" android:layout_width="match_parent" android:layout_height="match_parent" android:visibility="gone"/>
-    <androidx.recyclerview.widget.RecyclerView android:id="@+id/suggestions" android:layout_width="match_parent" android:layout_height="match_parent" android:background="#FFFFFF"/>
+    <androidx.recyclerview.widget.RecyclerView android:id="@+id/suggestions" android:layout_width="match_parent" android:layout_height="match_parent" android:background="@color/bg"/>
     <ProgressBar android:id="@+id/progress" android:layout_width="40dp" android:layout_height="40dp" android:layout_gravity="center" android:indeterminateTint="#FF0000" android:visibility="gone"/>
     <TextView android:id="@+id/message" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_gravity="center" android:gravity="center"
-        android:padding="24dp" android:textColor="#606060" android:textSize="15sp" android:visibility="gone"/>
+        android:padding="24dp" android:textColor="@color/text2" android:textSize="15sp" android:visibility="gone"/>
   </FrameLayout>
 </LinearLayout>

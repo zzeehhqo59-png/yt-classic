@@ -1,5 +1,9 @@
 package com.bear.ytclassic
 
+import android.content.Intent
+import android.widget.LinearLayout
+import androidx.appcompat.app.AlertDialog
+
 import android.os.Bundle
 import android.view.LayoutInflater
 import android.view.View
@@ -158,8 +162,46 @@ class LibraryFragment : Fragment() {
     }
 
     override fun onHiddenChanged(hidden: Boolean) { super.onHiddenChanged(hidden); if (!hidden) refreshCount() }
+    override fun onResume() { super.onResume(); refreshCount() }
+
+    private fun row(parent: LinearLayout, icon: Int, title: String, sub: String?, onLong: (() -> Unit)? = null, onClick: () -> Unit) {
+        val v = layoutInflater.inflate(R.layout.item_library_row, parent, false)
+        v.findViewById<ImageView>(R.id.icon).setImageResource(icon)
+        v.findViewById<TextView>(R.id.title).text = title
+        v.findViewById<TextView>(R.id.subtitle).apply { text = sub; visibility = if (sub.isNullOrEmpty()) View.GONE else View.VISIBLE }
+        v.setOnClickListener { onClick() }
+        onLong?.let { l -> v.setOnLongClickListener { l(); true } }
+        parent.addView(v)
+    }
 
     private fun refreshCount() {
-        view?.findViewById<TextView>(R.id.subsCount)?.text = "ติดตามอยู่ ${Subs.count()} ช่อง"
+        val view = view ?: return
+        val ctx = requireContext()
+        view.findViewById<TextView>(R.id.subsCount).text = "ติดตามอยู่ ${Subs.count()} ช่อง"
+        val top = view.findViewById<LinearLayout>(R.id.topRows); top.removeAllViews()
+        val h = History.count()
+        row(top, R.drawable.ic_history, "ประวัติการดู", if (h > 0) "$h วิดีโอ" else "ยังไม่มีวิดีโอที่ดู") { startActivity(VideoListActivity.history(ctx)) }
+        val pls = Playlists.all()
+        pls.firstOrNull { it.id == Playlists.WATCH_LATER }?.let { wl ->
+            row(top, R.drawable.ic_watch_later, wl.name, "${wl.count} วิดีโอ") { startActivity(VideoListActivity.local(ctx, wl.id)) }
+        }
+        val box = view.findViewById<LinearLayout>(R.id.playlists); box.removeAllViews()
+        row(box, R.drawable.ic_add, "สร้างเพลย์ลิสต์ใหม่", null) {
+            ctx.askName("เพลย์ลิสต์ใหม่", "") { name -> Playlists.create(name); refreshCount() }
+        }
+        pls.filter { it.id != Playlists.WATCH_LATER }.forEach { pl ->
+            row(box, R.drawable.ic_playlist, pl.name, "${pl.count} วิดีโอ", onLong = { playlistMenu(pl) }) { startActivity(VideoListActivity.local(ctx, pl.id)) }
+        }
+        val bottom = view.findViewById<LinearLayout>(R.id.bottomRows); bottom.removeAllViews()
+        row(bottom, R.drawable.ic_settings, "การตั้งค่า", "ธีม: ${Prefs.themeNames[Prefs.theme]}") { startActivity(Intent(ctx, SettingsActivity::class.java)) }
+    }
+
+    private fun playlistMenu(pl: Playlists.Pl) {
+        val ctx = requireContext()
+        AlertDialog.Builder(ctx).setTitle(pl.name).setItems(arrayOf("เปลี่ยนชื่อ", "ลบเพลย์ลิสต์")) { _, w ->
+            if (w == 0) ctx.askName("เปลี่ยนชื่อเพลย์ลิสต์", pl.name) { Playlists.rename(pl.id, it); refreshCount() }
+            else AlertDialog.Builder(ctx).setMessage("ลบเพลย์ลิสต์ ${pl.name} ใช่ไหม")
+                .setPositiveButton("ลบ") { _, _ -> Playlists.delete(pl.id); refreshCount() }.setNegativeButton("ยกเลิก", null).show()
+        }.show()
     }
 }

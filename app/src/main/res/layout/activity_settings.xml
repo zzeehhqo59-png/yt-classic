@@ -1,0 +1,24 @@
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android" android:id="@+id/root" android:layout_width="match_parent" android:layout_height="match_parent"
+    android:orientation="vertical" android:background="@color/bg">
+  <LinearLayout android:layout_width="match_parent" android:layout_height="48dp" android:orientation="horizontal" android:gravity="center_vertical" android:background="@color/bg" android:elevation="4dp">
+    <ImageButton android:id="@+id/btnBack" android:layout_width="48dp" android:layout_height="48dp" android:background="?attr/selectableItemBackgroundBorderless" android:src="@drawable/ic_back" android:contentDescription="@string/back"/>
+    <TextView android:layout_width="0dp" android:layout_weight="1" android:layout_height="wrap_content" android:layout_marginStart="8dp" android:text="การตั้งค่า" android:textColor="@color/text1" android:textSize="18sp"/>
+  </LinearLayout>
+  <ScrollView android:layout_width="match_parent" android:layout_height="match_parent">
+    <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="vertical">
+      <LinearLayout android:id="@+id/rowTheme" android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="vertical" android:padding="16dp" android:background="?attr/selectableItemBackground">
+        <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="ธีม" android:textColor="@color/text1" android:textSize="15sp"/>
+        <TextView android:id="@+id/themeValue" android:layout_width="wrap_content" android:layout_height="wrap_content" android:textColor="@color/text2" android:textSize="13sp"/>
+      </LinearLayout>
+      <View android:layout_width="match_parent" android:layout_height="1dp" android:background="@color/divider"/>
+      <com.google.android.material.switchmaterial.SwitchMaterial android:id="@+id/swBackground" android:layout_width="match_parent" android:layout_height="wrap_content" android:padding="16dp"
+          android:text="เล่นต่อในเบื้องหลัง\nเสียงยังเล่นต่อเมื่อกดปุ่มโฮมหรือปิดหน้าจอ" android:textColor="@color/text1" android:textSize="15sp"/>
+      <com.google.android.material.switchmaterial.SwitchMaterial android:id="@+id/swPip" android:layout_width="match_parent" android:layout_height="wrap_content" android:padding="16dp"
+          android:text="จอลอย (ภาพซ้อนภาพ)\nย่อวิดีโอเป็นจอเล็กลอยอัตโนมัติเมื่อกดปุ่มโฮมระหว่างเล่น" android:textColor="@color/text1" android:textSize="15sp"/>
+      <View android:layout_width="match_parent" android:layout_height="1dp" android:background="@color/divider"/>
+      <TextView android:id="@+id/rowClearHistory" android:layout_width="match_parent" android:layout_height="wrap_content" android:padding="16dp" android:background="?attr/selectableItemBackground"
+          android:text="ล้างประวัติการดูทั้งหมด" android:textColor="@color/text1" android:textSize="15sp"/>
+      <TextView android:id="@+id/version" android:layout_width="match_parent" android:layout_height="wrap_content" android:padding="16dp" android:textColor="@color/text3" android:textSize="12sp"/>
+    </LinearLayout>
+  </ScrollView>
+</LinearLayout>

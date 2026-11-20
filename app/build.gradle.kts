@@ -18,8 +18,8 @@ android {
         applicationId = "com.bear.ytclassic"
         minSdk = 23
         targetSdk = 35
-        versionCode = 3000
-        versionName = "2.0.0"
+        versionCode = 4000
+        versionName = "3.0.0"
     }
 
     signingConfigs {
@@ -76,4 +76,5 @@ dependencies {
     implementation("com.google.android.exoplayer:exoplayer-hls:2.19.1")
     implementation("com.google.android.exoplayer:exoplayer-dash:2.19.1")
     implementation("com.google.android.exoplayer:exoplayer-ui:2.19.1")
+    implementation("com.google.android.exoplayer:extension-mediasession:2.19.1")
 }

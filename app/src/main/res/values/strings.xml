@@ -24,4 +24,5 @@
   <string name="show_less">แสดงน้อยลง</string>
   <string name="up_next">วิดีโอถัดไป</string>
   <string name="choose_quality">เลือกคุณภาพวิดีโอ</string>
+  <string name="notif_channel">การเล่นวิดีโอ</string>
 </resources>

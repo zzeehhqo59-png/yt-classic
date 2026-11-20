@@ -1,0 +1,12 @@
+<resources>
+  <color name="bg">#FFFFFF</color>
+  <color name="surface">#FFFFFF</color>
+  <color name="text1">#0F0F0F</color>
+  <color name="text2">#606060</color>
+  <color name="text3">#909090</color>
+  <color name="divider">#E5E5E5</color>
+  <color name="placeholder">#E0E0E0</color>
+  <color name="icon">#606060</color>
+  <color name="link">#065FD4</color>
+  <color name="chip_bg">#F2F2F2</color>
+</resources>

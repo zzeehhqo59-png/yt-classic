@@ -5,8 +5,8 @@
   <ProgressBar android:id="@+id/progress" android:layout_width="40dp" android:layout_height="40dp" android:layout_gravity="center" android:indeterminateTint="#FF0000" android:visibility="gone"/>
   <LinearLayout android:id="@+id/errorBox" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_gravity="center"
       android:orientation="vertical" android:gravity="center" android:padding="24dp" android:visibility="gone">
-    <TextView android:id="@+id/errorText" android:layout_width="wrap_content" android:layout_height="wrap_content" android:gravity="center" android:textColor="#606060" android:textSize="15sp"/>
+    <TextView android:id="@+id/errorText" android:layout_width="wrap_content" android:layout_height="wrap_content" android:gravity="center" android:textColor="@color/text2" android:textSize="15sp"/>
     <Button android:id="@+id/btnRetry" style="@style/Widget.MaterialComponents.Button.TextButton" android:layout_width="wrap_content" android:layout_height="wrap_content"
-        android:layout_marginTop="8dp" android:text="@string/retry" android:textColor="#065FD4"/>
+        android:layout_marginTop="8dp" android:text="@string/retry" android:textColor="@color/link"/>
   </LinearLayout>
 </FrameLayout>

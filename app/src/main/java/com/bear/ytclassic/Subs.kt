@@ -14,19 +14,10 @@ data class Channel(val url: String, val name: String, val avatar: String?, val s
 
 /** Local subscriptions (SQLite file ytclassic.db; the old NewPipe-fork database is newpipe.db and is never written). */
 object Subs {
-    private lateinit var helper: SQLiteOpenHelper
+    private val helper get() = Db.helper
     /** Bumped on every change so screens know when to reload. */
     @Volatile var version = 0L
         private set
-
-    fun init(c: Context) {
-        helper = object : SQLiteOpenHelper(c.applicationContext, "ytclassic.db", null, 1) {
-            override fun onCreate(db: SQLiteDatabase) {
-                db.execSQL("CREATE TABLE subs (url TEXT PRIMARY KEY, name TEXT NOT NULL, avatar TEXT, subscribers INTEGER NOT NULL DEFAULT -1, added INTEGER NOT NULL)")
-            }
-            override fun onUpgrade(db: SQLiteDatabase, o: Int, n: Int) {}
-        }
-    }
 
     /** Canonical https://www.youtube.com/channel/UC... form when possible. */
     fun normalize(url: String): String =

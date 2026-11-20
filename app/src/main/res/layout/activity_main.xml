@@ -1,19 +1,35 @@
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android" xmlns:app="http://schemas.android.com/apk/res-auto"
-    android:id="@+id/root" android:layout_width="match_parent" android:layout_height="match_parent" android:orientation="vertical" android:background="#FFFFFF">
+    android:id="@+id/root" android:layout_width="match_parent" android:layout_height="match_parent" android:orientation="vertical" android:background="@color/bg">
   <LinearLayout android:id="@+id/topBar" android:layout_width="match_parent" android:layout_height="48dp" android:orientation="horizontal"
-      android:gravity="center_vertical" android:background="#FFFFFF" android:elevation="4dp" android:paddingStart="16dp" android:paddingEnd="4dp">
+      android:gravity="center_vertical" android:background="@color/bg" android:elevation="4dp" android:paddingStart="16dp" android:paddingEnd="4dp">
     <ImageView android:layout_width="28dp" android:layout_height="20dp" android:src="@drawable/ic_yt_logo" android:importantForAccessibility="no"/>
     <TextView android:id="@+id/logoText" android:layout_width="0dp" android:layout_weight="1" android:layout_height="wrap_content" android:layout_marginStart="4dp"
-        android:text="YouTube" android:textColor="#212121" android:textSize="20sp" android:textStyle="bold" android:letterSpacing="-0.04" android:fontFamily="sans-serif-condensed"/>
+        android:text="YouTube" android:textColor="@color/text1" android:textSize="20sp" android:textStyle="bold" android:letterSpacing="-0.04" android:fontFamily="sans-serif-condensed"/>
     <ImageButton android:id="@+id/btnSearch" android:layout_width="48dp" android:layout_height="48dp" android:background="?attr/selectableItemBackgroundBorderless"
         android:src="@drawable/ic_search" android:contentDescription="@string/search"/>
     <ImageButton android:id="@+id/btnAccount" android:layout_width="48dp" android:layout_height="48dp" android:background="?attr/selectableItemBackgroundBorderless"
         android:src="@drawable/ic_account" android:contentDescription="@string/account"/>
   </LinearLayout>
   <FrameLayout android:id="@+id/container" android:layout_width="match_parent" android:layout_height="0dp" android:layout_weight="1"/>
-  <View android:layout_width="match_parent" android:layout_height="1dp" android:background="#E5E5E5"/>
+  <LinearLayout android:id="@+id/miniBar" android:layout_width="match_parent" android:layout_height="56dp" android:orientation="horizontal" android:gravity="center_vertical"
+      android:background="@color/surface" android:elevation="6dp" android:visibility="gone" android:clickable="true" android:focusable="true">
+    <FrameLayout android:layout_width="100dp" android:layout_height="match_parent" android:background="#000000">
+      <com.google.android.exoplayer2.ui.StyledPlayerView android:id="@+id/miniPlayer" android:layout_width="match_parent" android:layout_height="match_parent"
+          app:use_controller="false" app:resize_mode="zoom" app:surface_type="texture_view" app:shutter_background_color="#000000"/>
+      <ImageView android:id="@+id/miniThumb" android:layout_width="match_parent" android:layout_height="match_parent" android:scaleType="centerCrop" android:importantForAccessibility="no"/>
+    </FrameLayout>
+    <LinearLayout android:layout_width="0dp" android:layout_weight="1" android:layout_height="wrap_content" android:orientation="vertical" android:paddingStart="12dp" android:paddingEnd="4dp">
+      <TextView android:id="@+id/miniTitle" android:layout_width="match_parent" android:layout_height="wrap_content" android:maxLines="1" android:ellipsize="end" android:textColor="@color/text1" android:textSize="14sp"/>
+      <TextView android:id="@+id/miniChannel" android:layout_width="match_parent" android:layout_height="wrap_content" android:maxLines="1" android:ellipsize="end" android:textColor="@color/text2" android:textSize="12sp"/>
+    </LinearLayout>
+    <ImageButton android:id="@+id/miniPlay" android:layout_width="48dp" android:layout_height="48dp" android:background="?attr/selectableItemBackgroundBorderless" android:src="@drawable/ic_pause" android:contentDescription="เล่นหรือหยุดชั่วคราว"/>
+    <ImageButton android:id="@+id/miniClose" android:layout_width="48dp" android:layout_height="48dp" android:background="?attr/selectableItemBackgroundBorderless" android:src="@drawable/ic_close" android:contentDescription="ปิด"/>
+  </LinearLayout>
+  <ProgressBar android:id="@+id/miniProgress" style="?android:attr/progressBarStyleHorizontal" android:layout_width="match_parent" android:layout_height="2dp"
+      android:progressTint="#FF0000" android:progressBackgroundTint="@color/divider" android:max="1000" android:visibility="gone"/>
+  <View android:layout_width="match_parent" android:layout_height="1dp" android:background="@color/divider"/>
   <com.google.android.material.bottomnavigation.BottomNavigationView android:id="@+id/bottomNav"
-      android:layout_width="match_parent" android:layout_height="56dp" android:background="#FFFFFF"
+      android:layout_width="match_parent" android:layout_height="56dp" android:background="@color/bg"
       app:menu="@menu/bottom_nav" app:itemIconTint="@color/nav_tint" app:itemTextColor="@color/nav_tint"
       app:labelVisibilityMode="labeled" app:elevation="0dp" app:itemTextAppearanceActive="@style/NavText" app:itemTextAppearanceInactive="@style/NavText"/>
 </LinearLayout>

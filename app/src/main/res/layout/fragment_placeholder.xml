@@ -1,8 +1,8 @@
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android" android:layout_width="match_parent" android:layout_height="match_parent"
     android:orientation="vertical" android:gravity="center" android:padding="32dp">
-  <ImageView android:id="@+id/phIcon" android:layout_width="96dp" android:layout_height="96dp" android:importantForAccessibility="no" app:tint="#BDBDBD" xmlns:app="http://schemas.android.com/apk/res-auto"/>
+  <ImageView android:id="@+id/phIcon" android:layout_width="96dp" android:layout_height="96dp" android:importantForAccessibility="no" app:tint="@color/text3" xmlns:app="http://schemas.android.com/apk/res-auto"/>
   <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="16dp" android:text="@string/coming_soon"
-      android:textColor="#212121" android:textSize="20sp" android:textStyle="bold"/>
+      android:textColor="@color/text1" android:textSize="20sp" android:textStyle="bold"/>
   <TextView android:id="@+id/phDesc" android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="8dp" android:gravity="center"
-      android:textColor="#606060" android:textSize="14sp"/>
+      android:textColor="@color/text2" android:textSize="14sp"/>
 </LinearLayout>

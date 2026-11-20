@@ -7,6 +7,12 @@ import android.view.View
 import android.view.ViewGroup
 import android.widget.ImageButton
 import android.widget.ImageView
+import android.widget.ProgressBar
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.repeatOnLifecycle
+import coil3.load
+import com.google.android.exoplayer2.Player
+import com.google.android.exoplayer2.ui.StyledPlayerView
 import android.widget.TextView
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
@@ -29,8 +35,9 @@ class MainActivity : AppCompatActivity() {
             startActivity(Intent(this, SearchActivity::class.java))
         }
         findViewById<ImageButton>(R.id.btnAccount).setOnClickListener {
-            Toast.makeText(this, R.string.coming_soon, Toast.LENGTH_SHORT).show()
+            startActivity(Intent(this, SettingsActivity::class.java))
         }
+        setupMini()
         val nav = findViewById<BottomNavigationView>(R.id.bottomNav)
         nav.setOnItemSelectedListener { show(it.itemId); true }
         nav.setOnItemReselectedListener { if (it.itemId == R.id.nav_home) (supportFragmentManager.findFragmentByTag("home") as? HomeFragment)?.scrollTop() }
@@ -39,6 +46,68 @@ class MainActivity : AppCompatActivity() {
             val n = Subs.importOldAppOnce(applicationContext)
             if (n != null && n > 0) Toast.makeText(this@MainActivity, "นำเข้าช่องที่ติดตามจากแอปเดิมแล้ว $n ช่อง", Toast.LENGTH_LONG).show()
         }
+    }
+
+    private lateinit var miniBar: View
+    private lateinit var miniPlayer: StyledPlayerView
+    private lateinit var miniProgress: ProgressBar
+    private lateinit var miniPlay: ImageButton
+    private val ticker = object : Runnable {
+        override fun run() {
+            val p = Playback.player
+            if (p.duration > 0) miniProgress.progress = (p.currentPosition * 1000 / p.duration).toInt()
+            miniProgress.postDelayed(this, 500)
+        }
+    }
+    private val miniListener = object : Player.Listener {
+        override fun onIsPlayingChanged(isPlaying: Boolean) = updatePlayIcon()
+        override fun onPlayWhenReadyChanged(playWhenReady: Boolean, reason: Int) = updatePlayIcon()
+    }
+    private fun updatePlayIcon() { miniPlay.setImageResource(if (Playback.player.playWhenReady) R.drawable.ic_pause else R.drawable.ic_play) }
+
+    private fun setupMini() {
+        miniBar = findViewById(R.id.miniBar)
+        miniPlayer = findViewById(R.id.miniPlayer)
+        miniProgress = findViewById(R.id.miniProgress)
+        miniPlay = findViewById(R.id.miniPlay)
+        miniBar.setOnClickListener { Playback.state.value.item?.let { openVideo(it) } }
+        miniPlay.setOnClickListener {
+            val p = Playback.player
+            if (p.playbackState == Player.STATE_ENDED) p.seekTo(0)
+            p.playWhenReady = !p.playWhenReady
+        }
+        findViewById<View>(R.id.miniClose).setOnClickListener { Playback.close() }
+        lifecycleScope.launch {
+            repeatOnLifecycle(Lifecycle.State.STARTED) {
+                kotlinx.coroutines.flow.combine(Playback.state, Playback.pip) { a, b -> a to b }.collect { (st, pip) ->
+                    val it = st.item
+                    val vis = if (it == null || pip) View.GONE else View.VISIBLE
+                    if (pip) miniPlayer.player = null else if (miniPlayer.player == null) miniPlayer.player = Playback.player
+                    miniBar.visibility = vis; miniProgress.visibility = vis
+                    if (it != null) {
+                        findViewById<TextView>(R.id.miniTitle).text = it.title
+                        findViewById<TextView>(R.id.miniChannel).text = st.error?.lineSequence()?.firstOrNull() ?: it.channel
+                        val thumb = findViewById<ImageView>(R.id.miniThumb)
+                        if (thumb.tag != it.thumb) { thumb.tag = it.thumb; thumb.load(it.thumb) }
+                    }
+                }
+            }
+        }
+    }
+
+    override fun onStart() {
+        super.onStart()
+        if (!Playback.pip.value) miniPlayer.player = Playback.player
+        Playback.player.addListener(miniListener)
+        updatePlayIcon()
+        miniProgress.post(ticker)
+    }
+
+    override fun onStop() {
+        super.onStop()
+        miniProgress.removeCallbacks(ticker)
+        Playback.player.removeListener(miniListener)
+        miniPlayer.player = null
     }
 
     private fun show(id: Int) {
@@ -57,7 +126,8 @@ class MainActivity : AppCompatActivity() {
 }
 
 fun android.content.Context.openVideo(v: VideoItem) {
-    startActivity(Intent(this, WatchActivity::class.java).putExtra(WatchActivity.EXTRA_ITEM, v))
+    startActivity(Intent(this, WatchActivity::class.java).putExtra(WatchActivity.EXTRA_ITEM, v)
+        .addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP))
 }
 
 class HomeFragment : Fragment() {
@@ -82,6 +152,9 @@ class HomeFragment : Fragment() {
         reload(view)
     }
 
+    override fun onResume() { super.onResume(); if (::adapter.isInitialized) adapter.refreshProgress() }
+    override fun onHiddenChanged(hidden: Boolean) { if (!hidden && ::adapter.isInitialized) adapter.refreshProgress() }
+
     fun scrollTop() { if (::list.isInitialized) list.smoothScrollToPosition(0) }
 
     private fun reload(view: View, fromSwipe: Boolean = false) {
@@ -93,7 +166,7 @@ class HomeFragment : Fragment() {
         if (!fromSwipe) progress.visibility = View.VISIBLE
         job = viewLifecycleOwner.lifecycleScope.launch {
             try {
-                val p = Repo.homePager()
+                val p = Recommender.homePager(requireContext().applicationContext, force = fromSwipe)
                 pager = p
                 val items = p.next()
                 adapter.set(items)
@@ -124,16 +197,3 @@ class HomeFragment : Fragment() {
     }
 }
 
-class PlaceholderFragment : Fragment() {
-    override fun onCreateView(inflater: LayoutInflater, container: ViewGroup?, s: Bundle?): View {
-        val v = inflater.inflate(R.layout.fragment_placeholder, container, false)
-        v.findViewById<ImageView>(R.id.phIcon).setImageResource(requireArguments().getInt("icon"))
-        v.findViewById<TextView>(R.id.phDesc).setText(requireArguments().getInt("desc"))
-        return v
-    }
-    companion object {
-        fun new(icon: Int, desc: Int) = PlaceholderFragment().apply {
-            arguments = Bundle().apply { putInt("icon", icon); putInt("desc", desc) }
-        }
-    }
-}

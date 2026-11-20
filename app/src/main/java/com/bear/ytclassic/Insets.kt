@@ -13,11 +13,15 @@ fun Activity.edgeToEdge(lightBars: Boolean) {
         window.isStatusBarContrastEnforced = false
         window.isNavigationBarContrastEnforced = false
     }
+    val light = lightBars && !isNight()
     WindowCompat.getInsetsController(window, window.decorView).apply {
-        isAppearanceLightStatusBars = lightBars
-        isAppearanceLightNavigationBars = lightBars
+        isAppearanceLightStatusBars = light
+        isAppearanceLightNavigationBars = light
     }
 }
+
+fun android.content.Context.isNight() =
+    (resources.configuration.uiMode and android.content.res.Configuration.UI_MODE_NIGHT_MASK) == android.content.res.Configuration.UI_MODE_NIGHT_YES
 
 /**
  * Pads this view by the status bar / navigation bar / cutout insets and consumes them,

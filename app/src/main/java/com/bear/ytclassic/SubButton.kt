@@ -10,7 +10,7 @@ fun TextView.bindSubscribe(channel: () -> Channel?, onChange: () -> Unit = {}) {
         val ch = channel()
         val subbed = ch != null && Subs.isSubscribed(ch.url)
         text = if (subbed) "ติดตามแล้ว" else "ติดตาม"
-        setTextColor(if (subbed) 0xFF606060.toInt() else 0xFFCC0000.toInt())
+        setTextColor(if (subbed) androidx.core.content.ContextCompat.getColor(context, R.color.text2) else 0xFFCC0000.toInt())
         alpha = if (ch == null) 0.5f else 1f
     }
     render()

@@ -15,6 +15,8 @@ import org.schabi.newpipe.extractor.stream.StreamInfo
 import org.schabi.newpipe.extractor.stream.StreamInfoItem
 import org.schabi.newpipe.extractor.stream.StreamType
 import org.schabi.newpipe.extractor.channel.ChannelInfo
+import org.schabi.newpipe.extractor.channel.ChannelInfoItem
+import org.schabi.newpipe.extractor.playlist.PlaylistInfoItem
 import org.schabi.newpipe.extractor.channel.tabs.ChannelTabs
 import java.io.Serializable
 
@@ -33,6 +35,9 @@ data class VideoItem(
     val members: Boolean,
     val scheduledEpochMs: Long,
     val uploadedMs: Long = 0,
+    /** 0 = video, 1 = channel, 2 = playlist */
+    val kind: Int = 0,
+    val count: Long = -1,
 ) : Serializable
 
 fun List<Image>.pick(target: Int = 360): String? =
@@ -67,7 +72,19 @@ interface Pager {
     suspend fun next(): List<VideoItem>
 }
 
-class ListPager(private val extractor: ListExtractor<out InfoItem>) : Pager {
+fun List<InfoItem>.toItems(): List<VideoItem> = mapNotNull { i ->
+    when (i) {
+        is StreamInfoItem -> if (i.isShort()) null else i.toVideo()
+        is ChannelInfoItem -> VideoItem(url = i.url, title = i.name, channel = i.name, channelUrl = i.url, thumb = i.thumbnails.pick(176),
+            avatar = i.thumbnails.pick(68), durationSec = 0, views = i.subscriberCount, age = "", live = false, upcoming = false, members = false,
+            scheduledEpochMs = 0, kind = 1, count = i.streamCount)
+        is PlaylistInfoItem -> VideoItem(url = i.url, title = i.name, channel = i.uploaderName.orEmpty(), channelUrl = i.uploaderUrl, thumb = i.thumbnails.pick(360),
+            avatar = null, durationSec = 0, views = -1, age = "", live = false, upcoming = false, members = false, scheduledEpochMs = 0, kind = 2, count = i.streamCount)
+        else -> null
+    }
+}
+
+class ListPager(val extractor: ListExtractor<out InfoItem>, private val map: (List<InfoItem>) -> List<VideoItem> = { it.videosOnly() }) : Pager {
     private var page: Page? = null
     private var started = false
     override val hasMore get() = !started || Page.isValid(page)
@@ -76,7 +93,8 @@ class ListPager(private val extractor: ListExtractor<out InfoItem>) : Pager {
             extractor.fetchPage(); started = true; extractor.initialPage
         } else extractor.getPage(page)
         page = p.nextPage
-        p.items.videosOnly()
+        @Suppress("UNCHECKED_CAST")
+        map(p.items as List<InfoItem>)
     }
 }
 
@@ -118,8 +136,16 @@ object Repo {
         }
     }
 
-    fun searchPager(query: String): Pager =
-        ListPager(yt.getSearchExtractor(query, listOf("videos"), ""))
+    fun searchPager(query: String, filter: String = "videos"): Pager =
+        ListPager(yt.getSearchExtractor(query, listOf(filter), "")) { it.toItems() }
+
+    /** Content filters YouTube's search supports, in display order, with Thai labels (unsupported ones are never shown). */
+    fun searchFilters(): List<Pair<String, String>> {
+        val avail = runCatching { yt.searchQHFactory.availableContentFilter.toList() }.getOrDefault(emptyList())
+        return listOf("all" to "ทั้งหมด", "videos" to "วิดีโอ", "channels" to "ช่อง", "playlists" to "เพลย์ลิสต์").filter { it.first in avail }
+    }
+
+    fun playlistPager(url: String): ListPager = ListPager(yt.getPlaylistExtractor(url))
 
     suspend fun suggestions(query: String): List<String> = withContext(Dispatchers.IO) {
         yt.suggestionExtractor.suggestionList(query)

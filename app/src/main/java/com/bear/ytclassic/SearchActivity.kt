@@ -27,7 +27,10 @@ class SearchActivity : AppCompatActivity() {
     private lateinit var progress: View
     private lateinit var message: TextView
     private val sugAdapter = SuggestionAdapter({ submit(it) }, { fill(it) })
-    private val resAdapter = VideoAdapter(false) { openVideo(it) }
+    private val resAdapter = VideoAdapter(false) { openItem(it) }
+    private var filter = "all"
+    private var lastQuery = ""
+    private lateinit var filterBar: View
     private var sugJob: Job? = null
     private var searchJob: Job? = null
     private var pager: Pager? = null
@@ -66,6 +69,20 @@ class SearchActivity : AppCompatActivity() {
                 submit(query.text.toString()); true
             } else false
         }
+        filterBar = findViewById(R.id.filterBar)
+        val chips = findViewById<com.google.android.material.chip.ChipGroup>(R.id.chips)
+        val filters = Repo.searchFilters()
+        if (filters.none { it.first == filter }) filter = filters.firstOrNull()?.first ?: "videos"
+        filters.forEach { (id, label) ->
+            val chip = com.google.android.material.chip.Chip(this).apply {
+                text = label; isCheckable = true; isCheckedIconVisible = false; isChecked = id == filter
+                chipBackgroundColor = androidx.core.content.ContextCompat.getColorStateList(this@SearchActivity, R.color.chip_bg_state)
+                setTextColor(androidx.core.content.ContextCompat.getColorStateList(this@SearchActivity, R.color.chip_text_state))
+                setOnClickListener { if (filter != id) { filter = id; if (lastQuery.isNotEmpty()) submit(lastQuery) } }
+            }
+            chips.addView(chip)
+        }
+        if (filters.size < 2) chips.visibility = View.GONE
         query.requestFocus()
         intent.getStringExtra("q")?.let { submit(it) }
     }
@@ -78,6 +95,7 @@ class SearchActivity : AppCompatActivity() {
     private fun showSuggestions() {
         suggestions.visibility = View.VISIBLE
         message.visibility = View.GONE
+        filterBar.visibility = View.GONE
     }
 
     private fun fill(text: String) {
@@ -103,6 +121,8 @@ class SearchActivity : AppCompatActivity() {
         (getSystemService(INPUT_METHOD_SERVICE) as InputMethodManager).hideSoftInputFromWindow(query.windowToken, 0)
         query.clearFocus()
         suggestions.visibility = View.GONE
+        lastQuery = text
+        filterBar.visibility = View.VISIBLE
         results.visibility = View.VISIBLE
         message.visibility = View.GONE
         resAdapter.set(emptyList())
@@ -110,7 +130,7 @@ class SearchActivity : AppCompatActivity() {
         searchJob?.cancel()
         searchJob = lifecycleScope.launch {
             try {
-                val p = Repo.searchPager(text)
+                val p = Repo.searchPager(text, filter)
                 pager = p
                 val items = p.next()
                 resAdapter.set(items)

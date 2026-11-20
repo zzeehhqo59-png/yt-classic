@@ -29,9 +29,13 @@ fun ImageView.loadAvatar(url: String?) {
 /** List of videos. big = home cards, otherwise compact rows (search / related). */
 class VideoAdapter(
     private val big: Boolean,
+    private val onMore: ((View, VideoItem) -> Unit)? = null,
     private val onClick: (VideoItem) -> Unit,
 ) : RecyclerView.Adapter<RecyclerView.ViewHolder>() {
     val items = ArrayList<VideoItem>()
+    /** url -> watched fraction (0..1000), shown as a red bar on the thumbnail. */
+    var progress: Map<String, Int> = emptyMap()
+    fun refreshProgress() { progress = History.progressMap(); notifyItemRangeChanged(0, items.size) }
     var loadingMore = false
         set(v) {
             if (field == v) return
@@ -62,8 +66,17 @@ class VideoAdapter(
         private val meta: TextView = v.findViewById(R.id.meta)
         private val channel: TextView? = v.findViewById(R.id.channel)
         private val avatar: ImageView? = v.findViewById(R.id.avatar)
+        private val more: View? = v.findViewById(R.id.more)
+        private val watched: android.widget.ProgressBar? = v.findViewById(R.id.watched)
 
         fun bind(it: VideoItem) {
+            more?.setOnClickListener { view -> (onMore ?: { a, b -> a.showVideoMenu(b) })(view, it) }
+            val p = progress[it.url] ?: 0
+            watched?.visibility = if (p > 0 && it.kind == 0) View.VISIBLE else View.GONE
+            watched?.progress = p
+            if (it.kind != 0) { bindOther(it); return }
+            thumb.scaleType = ImageView.ScaleType.CENTER_CROP
+            avatar?.visibility = View.VISIBLE
             thumb.load(it.thumb) { crossfade(true) }
             when {
                 it.live -> { duration.text = "สด"; duration.setBackgroundResource(R.drawable.bg_live); duration.visibility = View.VISIBLE }
@@ -82,6 +95,30 @@ class VideoAdapter(
             }
             avatar?.loadAvatar(it.avatar)
             itemView.setOnClickListener { _ -> onClick(it) }
+        }
+
+        /** Channel / playlist rows in search results. */
+        private fun bindOther(it: VideoItem) {
+            title.text = it.title
+            itemView.setOnClickListener { _ -> onClick(it) }
+            if (it.kind == 1) {
+                thumb.scaleType = ImageView.ScaleType.FIT_CENTER
+                thumb.load(it.thumb) { transformations(CircleCropTransformation()) }
+                duration.visibility = View.GONE
+                avatar?.visibility = View.GONE
+                val parts = listOf(if (it.views >= 0) Fmt.subscribers(it.views) else "", if (it.count >= 0) "วิดีโอ ${Fmt.shortNum(it.count)} รายการ" else "")
+                    .filter { s -> s.isNotBlank() }
+                channel?.text = "ช่อง"
+                meta.text = parts.joinToString(" · ")
+            } else {
+                thumb.scaleType = ImageView.ScaleType.CENTER_CROP
+                thumb.load(it.thumb) { crossfade(true) }
+                duration.text = if (it.count >= 0) "${Fmt.shortNum(it.count)} วิดีโอ" else "เพลย์ลิสต์"
+                duration.setBackgroundResource(R.drawable.bg_duration); duration.visibility = View.VISIBLE
+                avatar?.visibility = View.GONE
+                channel?.text = it.channel
+                meta.text = if (channel == null) listOf(it.channel, "เพลย์ลิสต์").filter { s -> s.isNotBlank() }.joinToString(" · ") else "เพลย์ลิสต์"
+            }
         }
     }
 }
