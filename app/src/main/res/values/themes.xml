@@ -6,13 +6,13 @@
     <item name="colorSecondary">#FF0000</item>
     <item name="colorAccent">#FF0000</item>
     <item name="colorControlNormal">#606060</item>
-    <item name="android:statusBarColor">#E0E0E0</item>
+    <item name="android:statusBarColor">@android:color/transparent</item>
     <item name="android:windowLightStatusBar">true</item>
-    <item name="android:navigationBarColor">#FFFFFF</item>
+    <item name="android:navigationBarColor">@android:color/transparent</item>
     <item name="android:windowBackground">@android:color/white</item>
   </style>
   <style name="Theme.YTClassic.Watch" parent="Theme.YTClassic">
-    <item name="android:statusBarColor">#000000</item>
+    <item name="android:statusBarColor">@android:color/transparent</item>
     <item name="android:windowLightStatusBar">false</item>
   </style>
   <style name="NavText" parent="TextAppearance.MaterialComponents.Caption"><item name="android:textSize">11sp</item></style>

@@ -1,0 +1,45 @@
+<resources>
+  <!-- Thai text for the ExoPlayer controls regardless of the phone language -->
+  <string name="exo_controls_cc_disabled_description">เปิดคำบรรยาย</string>
+  <string name="exo_controls_cc_enabled_description">ปิดคำบรรยาย</string>
+  <string name="exo_controls_fastforward_description">ไปข้างหน้า 10 วินาที</string>
+  <string name="exo_controls_rewind_description">ย้อนกลับ 10 วินาที</string>
+  <string name="exo_controls_fullscreen_enter_description">เต็มหน้าจอ</string>
+  <string name="exo_controls_fullscreen_exit_description">ออกจากโหมดเต็มหน้าจอ</string>
+  <string name="exo_controls_hide">ซ่อนปุ่มควบคุม</string>
+  <string name="exo_controls_show">แสดงปุ่มควบคุม</string>
+  <string name="exo_controls_next_description">ถัดไป</string>
+  <string name="exo_controls_previous_description">ก่อนหน้า</string>
+  <string name="exo_controls_overflow_hide_description">ซ่อนการตั้งค่าเพิ่มเติม</string>
+  <string name="exo_controls_overflow_show_description">แสดงการตั้งค่าเพิ่มเติม</string>
+  <string name="exo_controls_pause_description">หยุดชั่วคราว</string>
+  <string name="exo_controls_play_description">เล่น</string>
+  <string name="exo_controls_playback_speed">ความเร็วในการเล่น</string>
+  <string name="exo_controls_repeat_all_description">เล่นซ้ำทั้งหมด</string>
+  <string name="exo_controls_repeat_off_description">ไม่เล่นซ้ำ</string>
+  <string name="exo_controls_repeat_one_description">เล่นซ้ำรายการเดียว</string>
+  <string name="exo_controls_seek_bar_description">ความคืบหน้าในการเล่น</string>
+  <string name="exo_controls_settings_description">การตั้งค่า</string>
+  <string name="exo_controls_shuffle_off_description">เปิดการสุ่ม</string>
+  <string name="exo_controls_shuffle_on_description">ปิดการสุ่ม</string>
+  <string name="exo_controls_stop_description">หยุด</string>
+  <string name="exo_controls_vr_description">โหมด VR</string>
+  <string name="exo_track_mono">โมโน</string>
+  <string name="exo_track_role_alternate">อื่นๆ</string>
+  <string name="exo_track_role_closed_captions">คำบรรยาย</string>
+  <string name="exo_track_role_commentary">คำอธิบาย</string>
+  <string name="exo_track_role_supplementary">แทร็กเสริม</string>
+  <string name="exo_track_selection_auto">อัตโนมัติ</string>
+  <string name="exo_track_selection_none">ปิด</string>
+  <string name="exo_track_selection_title_audio">แทร็กเสียง</string>
+  <string name="exo_track_selection_title_text">คำบรรยาย</string>
+  <string name="exo_track_selection_title_video">วิดีโอ</string>
+  <string name="exo_track_stereo">สเตอริโอ</string>
+  <string name="exo_track_surround">เสียงรอบทิศทาง</string>
+  <string name="exo_track_surround_5_point_1">เสียงรอบทิศทาง 5.1</string>
+  <string name="exo_track_surround_7_point_1">เสียงรอบทิศทาง 7.1</string>
+  <string name="exo_track_unknown">ไม่ทราบ</string>
+  <string-array name="exo_controls_playback_speeds">
+    <item>0.25x</item><item>0.5x</item><item>0.75x</item><item>ปกติ</item><item>1.25x</item><item>1.5x</item><item>2x</item>
+  </string-array>
+</resources>

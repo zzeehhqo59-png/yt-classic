@@ -22,7 +22,9 @@ import kotlinx.coroutines.launch
 class MainActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        edgeToEdge(lightBars = true)
         setContentView(R.layout.activity_main)
+        findViewById<View>(R.id.root).padForSystemBars()
         findViewById<ImageButton>(R.id.btnSearch).setOnClickListener {
             startActivity(Intent(this, SearchActivity::class.java))
         }

@@ -35,7 +35,9 @@ class SearchActivity : AppCompatActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        edgeToEdge(lightBars = true)
         setContentView(R.layout.activity_search)
+        findViewById<View>(R.id.root).padForSystemBars()
         query = findViewById(R.id.query)
         suggestions = findViewById(R.id.suggestions)
         results = findViewById(R.id.results)
