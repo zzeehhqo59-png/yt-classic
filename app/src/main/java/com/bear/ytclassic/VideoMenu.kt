@@ -29,6 +29,7 @@ fun View.showVideoMenu(v: VideoItem, extra: List<Pair<String, () -> Unit>> = emp
             Playlists.add(Playlists.WATCH_LATER, v); Toast.makeText(c, "บันทึกลงในดูภายหลังแล้ว", Toast.LENGTH_SHORT).show()
         }
         add("บันทึกลงในเพลย์ลิสต์…") { c.saveToPlaylist(v) }
+        if (!v.live && !v.upcoming) add("ดาวน์โหลด") { Downloads.start(c, v) }
     }
     extra.forEach { (t, a) -> add(t, a) }
     add("แชร์") { c.shareUrl(v.url) }

@@ -21,6 +21,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
 class SearchActivity : AppCompatActivity() {
+    override fun onResume() { super.onResume(); resAdapter.refreshProgress() }
     private lateinit var query: EditText
     private lateinit var suggestions: RecyclerView
     private lateinit var results: RecyclerView

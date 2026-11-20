@@ -21,10 +21,16 @@ class DragFrame @JvmOverloads constructor(c: Context, a: AttributeSet? = null) :
         fun onDragStart()
         fun onDrag(dy: Float)
         fun onDragEnd(velocityY: Float)
+        /** Sideways drag (only when [horizontal] is on), e.g. swipe the mini player away. */
+        fun onDragX(dx: Float) {}
+        fun onDragXEnd(velocityX: Float) {}
     }
     var listener: Listener? = null
     var canDrag: () -> Boolean = { true }
     var direction = 1
+    /** Also allow sideways drags (reported through onDragX / onDragXEnd). */
+    var horizontal = false
+    private var axisX = false
     private val slop = ViewConfiguration.get(c).scaledTouchSlop
     private var downX = 0f
     private var downY = 0f
@@ -41,10 +47,14 @@ class DragFrame @JvmOverloads constructor(c: Context, a: AttributeSet? = null) :
         val dy = (ev.rawY - downY) * direction
         val dx = ev.rawX - downX
         if (dy > slop * 1.5f && dy > abs(dx) * 1.3f) {
-            dragging = true
+            dragging = true; axisX = false
             parent?.requestDisallowInterceptTouchEvent(true)
             downY = ev.rawY
             listener?.onDragStart()
+        } else if (horizontal && abs(dx) > slop * 1.5f && abs(dx) > abs(ev.rawY - downY) * 1.3f) {
+            dragging = true; axisX = true
+            parent?.requestDisallowInterceptTouchEvent(true)
+            downX = ev.rawX
         }
         return dragging
     }
@@ -62,16 +72,22 @@ class DragFrame @JvmOverloads constructor(c: Context, a: AttributeSet? = null) :
             MotionEvent.ACTION_DOWN -> { downX = ev.rawX; downY = ev.rawY; dragging = false; tracker?.clear(); track(ev); return true }
             MotionEvent.ACTION_MOVE -> {
                 track(ev)
-                if (maybeStart(ev)) listener?.onDrag(ev.rawY - downY)
+                if (maybeStart(ev)) { if (axisX) listener?.onDragX(ev.rawX - downX) else listener?.onDrag(ev.rawY - downY) }
             }
             MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
                 track(ev)
                 if (dragging) {
                     // emulators / busy phones batch moves: apply the final finger position before deciding
-                    if (ev.actionMasked == MotionEvent.ACTION_UP) listener?.onDrag(ev.rawY - downY)
+                    val up = ev.actionMasked == MotionEvent.ACTION_UP
                     tracker?.computeCurrentVelocity(1000)
                     dragging = false
-                    listener?.onDragEnd(if (ev.actionMasked == MotionEvent.ACTION_CANCEL) 0f else tracker?.yVelocity ?: 0f)
+                    if (axisX) {
+                        if (up) listener?.onDragX(ev.rawX - downX)
+                        listener?.onDragXEnd(if (up) tracker?.xVelocity ?: 0f else 0f)
+                    } else {
+                        if (up) listener?.onDrag(ev.rawY - downY)
+                        listener?.onDragEnd(if (up) tracker?.yVelocity ?: 0f else 0f)
+                    }
                 } else if (ev.actionMasked == MotionEvent.ACTION_UP && abs(ev.rawY - downY) < slop && abs(ev.rawX - downX) < slop) performClick()
             }
         }
@@ -93,4 +109,25 @@ fun Activity.setTranslucentCompat(translucent: Boolean) {
                 .apply { isAccessible = true }.invoke(this, null, null)
         }
     } catch (_: Throwable) { }
+}
+
+/**
+ * Where the floating mini player card sits (bottom-right, above the bottom nav), shared by the home screen
+ * and the watch page so the shrinking video lands exactly on the card.
+ */
+object MiniGeom {
+    private fun d(c: Context) = c.resources.displayMetrics.density
+    fun width(c: Context, screenW: Int) = (screenW * 0.48f).toInt()
+    fun height(c: Context, screenW: Int) = width(c, screenW) * 9 / 16
+    fun marginEnd(c: Context) = (8 * d(c)).toInt()
+    /** Gap between the card and the bottom of the padded root: bottom nav 56dp + divider 1dp + 8dp. */
+    fun marginBottom(c: Context) = (65 * d(c)).toInt()
+    fun radius(c: Context) = 12 * d(c)
+}
+
+/** Rounded corners for a view, radius changeable while animating. */
+class RoundOutline(var radius: Float) : android.view.ViewOutlineProvider() {
+    override fun getOutline(view: android.view.View, outline: android.graphics.Outline) {
+        outline.setRoundRect(0, 0, view.width, view.height, radius)
+    }
 }

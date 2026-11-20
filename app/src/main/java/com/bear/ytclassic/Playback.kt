@@ -67,6 +67,9 @@ object Playback {
     private var loadJob: Job? = null
     private val dsFactory by lazy { YtDataSource.Factory(DownloaderImpl.instance.client) }
     private var appVisible = true
+    /** Playing a downloaded file (no network, no re-fetch on errors). */
+    var offline = false; private set
+    private var offlineFile: java.io.File? = null
 
     val player: ExoPlayer by lazy {
         ExoPlayer.Builder(app)
@@ -81,6 +84,7 @@ object Playback {
                         savePosition()
                         // stream URLs expire / get throttled (typically after the app sat in the background): fetch fresh ones and continue
                         val sourceError = error.errorCode in 2000..3999
+                        if (offline) { _state.value = _state.value.copy(loading = false, error = "เล่นไฟล์ที่ดาวน์โหลดไว้ไม่ได้\n(ไฟล์อาจถูกลบหรือเสียหาย)"); return }
                         if (sourceError && retries < 2 && _state.value.item != null) { retries++; lastRetryAt = System.currentTimeMillis(); refetch(); return }
                         _state.value = _state.value.copy(loading = false, error = "เล่นวิดีโอไม่ได้ ลองเลือกคุณภาพอื่น\n(${error.errorCodeName})")
                     }
@@ -133,7 +137,17 @@ object Playback {
     }
 
     const val AUTO = Int.MAX_VALUE
+    private fun metered(): Boolean = runCatching {
+        (app.getSystemService(Context.CONNECTIVITY_SERVICE) as android.net.ConnectivityManager).isActiveNetworkMetered
+    }.getOrDefault(false)
+
     private fun defaultIndex(progressiveOnly: Boolean = false): Int {
+        // Settings > การเล่น: default height on Wi-Fi / mobile data (0 = อัตโนมัติ)
+        val want = if (metered()) Prefs.qualityMobile else Prefs.qualityWifi
+        if (want > 0) {
+            qualities.indexOfLast { it.height in 1..want }.takeIf { it >= 0 }?.let { return it }
+            qualities.indexOfFirst { it.height in 1 until AUTO }.takeIf { it >= 0 }?.let { return it }
+        }
         if (!progressiveOnly) qualities.indexOfFirst { it.height == AUTO }.takeIf { it >= 0 }?.let { return it }
         return qualities.indexOfLast { it.height in 1..720 }.takeIf { it >= 0 } ?: 0
     }
@@ -150,7 +164,7 @@ object Playback {
         if (_state.value.item?.url == item.url && _state.value.error == null) return
         savePosition()
         loadJob?.cancel()
-        retries = 0
+        retries = 0; offline = false; offlineFile = null
         player.stop(); player.clearMediaItems()
         qualities = emptyList(); current = -1; subtitles = emptyList(); live = false
         _state.value = State(item = item, loading = true)
@@ -215,10 +229,33 @@ object Playback {
         player.playWhenReady = true
     }
 
-    fun retry() { _state.value.item?.let { _state.value = _state.value.copy(error = "x"); open(it) } }
+    fun retry() {
+        val f = offlineFile
+        _state.value.item?.let { if (offline && f != null) openFile(it, f) else { _state.value = _state.value.copy(error = "x"); open(it) } }
+    }
+
+    /** Play a downloaded file (คลังวิดีโอ > การดาวน์โหลด) with the same player, offline. */
+    fun openFile(item: VideoItem, file: java.io.File) {
+        savePosition()
+        loadJob?.cancel()
+        retries = 0
+        player.stop(); player.clearMediaItems()
+        offline = true; offlineFile = file
+        live = false; subtitles = emptyList()
+        val factory = ProgressiveMediaSource.Factory(com.google.android.exoplayer2.upstream.DefaultDataSource.Factory(app))
+        qualities = listOf(Quality("ไฟล์ที่ดาวน์โหลด", 0) { factory.createMediaSource(MediaItem.fromUri(android.net.Uri.fromFile(file))) })
+        current = 0
+        _state.value = State(item = item, loading = true)
+        History.record(item)
+        runCatching { ContextCompat.startForegroundService(app, Intent(app, PlaybackService::class.java)) }
+        val saved = History.position(item.url)
+        val durMs = item.durationSec * 1000
+        play(0, if (saved > 5000 && (durMs <= 0 || saved < durMs - 15_000)) saved else 0)
+    }
 
     fun close() {
         savePosition()
+        offline = false; offlineFile = null
         loadJob?.cancel()
         player.stop(); player.clearMediaItems()
         qualities = emptyList(); current = -1

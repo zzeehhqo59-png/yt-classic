@@ -33,9 +33,17 @@ class VideoAdapter(
     private val onClick: (VideoItem) -> Unit,
 ) : RecyclerView.Adapter<RecyclerView.ViewHolder>() {
     val items = ArrayList<VideoItem>()
+    /** Everything given to the adapter; [items] is this minus unplayable videos when that setting is on. */
+    private val raw = ArrayList<VideoItem>()
+    private var hiding = Prefs.hideUnplayable
+    private fun visible(l: List<VideoItem>) = if (hiding) l.filter { it.unplayableBadge() == null } else l
     /** url -> watched fraction (0..1000), shown as a red bar on the thumbnail. */
     var progress: Map<String, Int> = emptyMap()
-    fun refreshProgress() { progress = History.progressMap(); notifyItemRangeChanged(0, items.size) }
+    fun refreshProgress() {
+        progress = History.progressMap()
+        if (hiding != Prefs.hideUnplayable) { hiding = Prefs.hideUnplayable; items.clear(); items.addAll(visible(raw)); notifyDataSetChanged() }
+        else notifyItemRangeChanged(0, items.size)
+    }
     var loadingMore = false
         set(v) {
             if (field == v) return
@@ -43,8 +51,8 @@ class VideoAdapter(
             if (v) notifyItemInserted(items.size) else notifyItemRemoved(items.size)
         }
 
-    fun set(list: List<VideoItem>) { items.clear(); items.addAll(list); notifyDataSetChanged() }
-    fun add(list: List<VideoItem>) { val s = items.size; items.addAll(list); notifyItemRangeInserted(s, list.size) }
+    fun set(list: List<VideoItem>) { hiding = Prefs.hideUnplayable; raw.clear(); raw.addAll(list); items.clear(); items.addAll(visible(list)); notifyDataSetChanged() }
+    fun add(list: List<VideoItem>) { raw.addAll(list); val v = visible(list); val s = items.size; items.addAll(v); notifyItemRangeInserted(s, v.size) }
 
     override fun getItemCount() = items.size + if (loadingMore) 1 else 0
     override fun getItemViewType(position: Int) = if (position >= items.size) 1 else 0
@@ -78,20 +86,27 @@ class VideoAdapter(
             thumb.scaleType = ImageView.ScaleType.CENTER_CROP
             avatar?.visibility = View.VISIBLE
             thumb.load(it.thumb) { crossfade(true) }
+            val badge = it.unplayableBadge()
             when {
                 it.live -> { duration.text = "สด"; duration.setBackgroundResource(R.drawable.bg_live); duration.visibility = View.VISIBLE }
-                it.upcoming -> { duration.text = "เร็วๆ นี้"; duration.setBackgroundResource(R.drawable.bg_duration); duration.visibility = View.VISIBLE }
+                badge != null -> { duration.text = badge; duration.setBackgroundResource(R.drawable.bg_badge); duration.visibility = View.VISIBLE }
                 it.durationSec > 0 -> { duration.text = Fmt.duration(it.durationSec); duration.setBackgroundResource(R.drawable.bg_duration); duration.visibility = View.VISIBLE }
                 else -> duration.visibility = View.GONE
             }
             title.text = it.title
             val views = Fmt.views(it.views, it.live)
-            val extra = if (it.members) "เฉพาะสมาชิก" else ""
+            val extra = when {
+                it.upcoming -> "รอเปิดตัว" + (it.scheduledEpochMs.takeIf { t -> t > 0 }?.let { t ->
+                    " " + Fmt.thaiDateTime(java.time.OffsetDateTime.ofInstant(java.time.Instant.ofEpochMilli(t), java.time.ZoneId.systemDefault()))
+                } ?: "")
+                it.unavailable -> "วิดีโอส่วนตัวหรือถูกลบ"
+                else -> badge.orEmpty()
+            }
             if (channel != null) {
                 channel.text = it.channel
-                meta.text = listOf(views, Fmt.ageMs(it.uploadedMs, it.age).takeUnless { _ -> it.live }.orEmpty(), extra).filter { s -> s.isNotBlank() }.joinToString(" · ")
+                meta.text = listOf(views, Fmt.ageMs(it.uploadedMs, it.age).takeUnless { _ -> it.live || it.upcoming }.orEmpty(), extra).filter { s -> s.isNotBlank() }.joinToString(" · ")
             } else {
-                meta.text = listOf(it.channel, views, Fmt.ageMs(it.uploadedMs, it.age).takeUnless { _ -> it.live }.orEmpty(), extra).filter { s -> s.isNotBlank() }.joinToString(" · ")
+                meta.text = listOf(it.channel, views, Fmt.ageMs(it.uploadedMs, it.age).takeUnless { _ -> it.live || it.upcoming }.orEmpty(), extra).filter { s -> s.isNotBlank() }.joinToString(" · ")
             }
             avatar?.loadAvatar(it.avatar)
             itemView.setOnClickListener { _ -> onClick(it) }

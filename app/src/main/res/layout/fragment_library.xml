@@ -1,6 +1,11 @@
 <ScrollView xmlns:android="http://schemas.android.com/apk/res/android" xmlns:app="http://schemas.android.com/apk/res-auto" android:layout_width="match_parent" android:layout_height="match_parent">
   <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="vertical" android:paddingTop="8dp" android:paddingBottom="16dp">
     <LinearLayout android:id="@+id/topRows" android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="vertical"/>
+    <LinearLayout android:id="@+id/downloadsBox" android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="vertical">
+      <View android:layout_width="match_parent" android:layout_height="1dp" android:layout_marginTop="8dp" android:background="@color/divider"/>
+      <TextView android:id="@+id/downloadsTitle" android:layout_width="match_parent" android:layout_height="wrap_content" android:padding="16dp" android:text="การดาวน์โหลด" android:textColor="@color/text1" android:textSize="15sp" android:textStyle="bold"/>
+      <LinearLayout android:id="@+id/downloads" android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="vertical"/>
+    </LinearLayout>
     <View android:layout_width="match_parent" android:layout_height="1dp" android:layout_marginTop="8dp" android:background="@color/divider"/>
     <TextView android:layout_width="match_parent" android:layout_height="wrap_content" android:padding="16dp" android:text="เพลย์ลิสต์" android:textColor="@color/text1" android:textSize="15sp" android:textStyle="bold"/>
     <LinearLayout android:id="@+id/playlists" android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="vertical"/>

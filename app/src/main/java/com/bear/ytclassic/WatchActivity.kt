@@ -43,6 +43,8 @@ class WatchActivity : AppCompatActivity() {
         const val EXTRA_ITEM = "item"
         /** Start the page collapsed at this drag progress (1 = mini player) and animate it open. */
         const val EXTRA_EXPAND_FROM = "expand_from"
+        /** Path of a downloaded file to play offline. */
+        const val EXTRA_FILE = "file"
     }
 
     private lateinit var item: VideoItem
@@ -155,7 +157,18 @@ class WatchActivity : AppCompatActivity() {
         @Suppress("DEPRECATION")
         val v = i.getSerializableExtra(EXTRA_ITEM) as? VideoItem ?: Playback.state.value.item ?: return false
         item = v
-        if (Playback.state.value.item?.url != v.url) {
+        val file = i.getStringExtra(EXTRA_FILE)?.let { java.io.File(it) }
+        if (file != null) {
+            if (Playback.state.value.item?.url != v.url || !Playback.offline) {
+                boundInfo = null; commentsFor = null
+                header.reset(); header.bindItem(v); header.setComments(null, null, null)
+                related.set(emptyList())
+                Playback.openFile(v, file)
+            }
+        } else if (Playback.state.value.item?.url == v.url) {
+            // page re-created for the video already playing (e.g. opened from the mini player): show its details now
+            if (boundInfo == null) Playback.state.value.let { st -> if (st.info != null) { boundInfo = st.info; header.bindInfo(st.info); related.set(st.info.relatedItems.videosOnly()) } else header.bindItem(st.item ?: v) }
+        } else if (Playback.state.value.item?.url != v.url) {
             boundInfo = null
             header.reset()
             header.bindItem(v)
@@ -224,21 +237,27 @@ class WatchActivity : AppCompatActivity() {
 
     // ---- drag to minimize ----
     private fun dp(v: Float) = v * resources.displayMetrics.density
-    /** Distance the player travels to reach the mini bar (above the bottom nav of the home screen). */
-    private fun range(): Float {
-        val target = root.height - root.paddingBottom - dp(56f + 1f + 2f + 56f)
-        return (target - playerBox.top).coerceAtLeast(dp(100f))
-    }
+    /** Floating card rect (in root coordinates) the video shrinks into: bottom-right, above the home screen's bottom nav. */
+    private fun cardW() = MiniGeom.width(this, playerBox.width.coerceAtLeast(1)).toFloat()
+    private fun cardLeft() = playerBox.width - MiniGeom.marginEnd(this) - cardW()
+    private fun cardTop() = root.height - root.paddingBottom - MiniGeom.marginBottom(this) - MiniGeom.height(this, playerBox.width.coerceAtLeast(1)).toFloat()
+    /** Vertical distance the video travels from its place at the top to the card. */
+    private fun range(): Float = (cardTop() - playerBox.top).coerceAtLeast(dp(100f))
+    private val playerOutline by lazy { RoundOutline(0f).also { playerBox.outlineProvider = it; playerBox.clipToOutline = true } }
 
+    /** 0 = full watch page, 1 = only the video left, shrunk into the bottom-right card; details fade, the screen below shows through. */
     private fun setProgress(p: Float) {
         progress = p.coerceIn(0f, 1f)
         val w = playerBox.width.toFloat().coerceAtLeast(1f)
-        val sc = 1f - progress * (1f - dp(100f) / w)
+        val sc = 1f - progress * (1f - cardW() / w)
         playerBox.pivotX = 0f; playerBox.pivotY = 0f
         playerBox.scaleX = sc; playerBox.scaleY = sc
+        playerBox.translationX = progress * cardLeft()
         playerBox.translationY = progress * range()
-        list.alpha = 1f - progress
-        list.translationY = progress * dp(160f)
+        playerOutline.radius = MiniGeom.radius(this) * progress / sc
+        playerBox.invalidateOutline()
+        list.alpha = (1f - progress * 1.8f).coerceIn(0f, 1f)
+        list.translationY = progress * dp(120f)
         rootBg.alpha = ((1f - progress) * 255).toInt()
     }
 
@@ -325,7 +344,13 @@ class WatchActivity : AppCompatActivity() {
     /** Take the video surface back (the mini bar may have grabbed it). */
     private fun reattach() { playerView.player = null; playerView.player = player }
 
-    override fun onResume() { super.onResume(); reattach(); internalNav = false; updatePipParams(); header.notifyItemChanged(0) }
+    override fun onResume() {
+        super.onResume(); reattach(); internalNav = false; updatePipParams(); header.notifyItemChanged(0)
+        // the controller's time label can stay at 00:00 after re-attaching while paused: nudge it with a no-op seek
+        playerView.postDelayed({
+            if (!player.isPlaying && player.playbackState == Player.STATE_READY) player.seekTo(player.currentPosition)
+        }, 350)
+    }
 
     /** Opening another screen of this app (channel, share sheet...) must not turn the video into a popup. */
     private var internalNav = false
@@ -502,6 +527,10 @@ class WatchActivity : AppCompatActivity() {
             v.findViewById<View>(R.id.btnQuality).setOnClickListener { pickQuality() }
             v.findViewById<View>(R.id.btnShare).setOnClickListener { shareUrl(item.url) }
             v.findViewById<View>(R.id.btnSave).setOnClickListener { saveToPlaylist(item) }
+            v.findViewById<View>(R.id.upNext).visibility = if (Playback.offline) View.GONE else View.VISIBLE
+            v.findViewById<View>(R.id.btnDownload).setOnClickListener {
+                Downloads.start(this@WatchActivity, item, boundInfo?.takeIf { it.url == item.url || Playback.state.value.item?.url == item.url })
+            }
             val cRow = v.findViewById<View>(R.id.commentsRow)
             cRow.visibility = if (cTitle == null) View.GONE else View.VISIBLE
             v.findViewById<View>(R.id.commentsDivider).visibility = cRow.visibility

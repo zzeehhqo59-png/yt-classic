@@ -18,12 +18,12 @@ object Db {
     private const val VDEF = "url TEXT NOT NULL, title TEXT, channel TEXT, channel_url TEXT, thumb TEXT, avatar TEXT, duration INTEGER, views INTEGER, uploaded_ms INTEGER"
 
     fun init(c: Context) {
-        helper = object : SQLiteOpenHelper(c.applicationContext, "ytclassic.db", null, 2) {
+        helper = object : SQLiteOpenHelper(c.applicationContext, "ytclassic.db", null, 3) {
             override fun onCreate(db: SQLiteDatabase) {
                 db.execSQL("CREATE TABLE subs (url TEXT PRIMARY KEY, name TEXT NOT NULL, avatar TEXT, subscribers INTEGER NOT NULL DEFAULT -1, added INTEGER NOT NULL)")
-                createV2(db)
+                createV2(db); createV3(db)
             }
-            override fun onUpgrade(db: SQLiteDatabase, o: Int, n: Int) { if (o < 2) createV2(db) }
+            override fun onUpgrade(db: SQLiteDatabase, o: Int, n: Int) { if (o < 2) createV2(db); if (o < 3) createV3(db) }
         }
     }
 
@@ -32,6 +32,12 @@ object Db {
         db.execSQL("CREATE TABLE playlists (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL, created INTEGER NOT NULL)")
         db.execSQL("CREATE TABLE playlist_items (playlist_id INTEGER NOT NULL, $VDEF, added INTEGER NOT NULL, PRIMARY KEY(playlist_id, url))")
         db.execSQL("INSERT INTO playlists (id, name, created) VALUES (${Playlists.WATCH_LATER}, 'ดูภายหลัง', 0)")
+    }
+
+    private fun createV3(db: SQLiteDatabase) {
+        db.execSQL("CREATE TABLE downloads (id INTEGER PRIMARY KEY AUTOINCREMENT, url TEXT NOT NULL, title TEXT, channel TEXT, thumb TEXT, duration INTEGER, " +
+            "audio_only INTEGER NOT NULL, height INTEGER NOT NULL, status INTEGER NOT NULL, done_bytes INTEGER NOT NULL DEFAULT 0, total_bytes INTEGER NOT NULL DEFAULT 0, " +
+            "file TEXT, error TEXT, created INTEGER NOT NULL)")
     }
 
     fun values(v: VideoItem) = ContentValues().apply {
@@ -49,7 +55,7 @@ object Db {
 
 object History {
     fun record(v: VideoItem) {
-        if (v.kind != 0) return
+        if (v.kind != 0 || Prefs.historyPaused) return
         val now = System.currentTimeMillis()
         val cv = Db.values(v).apply { put("watched_at", now) }
         val db = Db.w
@@ -132,6 +138,21 @@ object Prefs {
     var background: Boolean
         get() = p.getBoolean("background", true)
         set(v) { p.edit().putBoolean("background", v).apply() }
+    private fun b(k: String, def: Boolean) = p.getBoolean(k, def)
+    private fun setB(k: String, v: Boolean) = p.edit().putBoolean(k, v).apply()
+    /** Don't add newly watched videos to the watch history. */
+    var historyPaused: Boolean get() = b("history_paused", false); set(v) = setB("history_paused", v)
+    /** Hide members-only / upcoming / paid / removed videos from lists. */
+    var hideUnplayable: Boolean get() = b("hide_unplayable", false); set(v) = setB("hide_unplayable", v)
+    /** Default video height on Wi-Fi / on mobile data; 0 = อัตโนมัติ (adaptive). */
+    var qualityWifi: Int get() = p.getInt("q_wifi", 0); set(v) = p.edit().putInt("q_wifi", v).apply()
+    var qualityMobile: Int get() = p.getInt("q_mobile", 0); set(v) = p.edit().putInt("q_mobile", v).apply()
+    /** Download defaults: height (0 = สูงสุด), audio only, ask every time. */
+    var dlQuality: Int get() = p.getInt("dl_quality", 720); set(v) = p.edit().putInt("dl_quality", v).apply()
+    var dlAudioOnly: Boolean get() = b("dl_audio", false); set(v) = setB("dl_audio", v)
+    var dlAsk: Boolean get() = b("dl_ask", true); set(v) = setB("dl_ask", v)
+    val qualityHeights = intArrayOf(0, 1080, 720, 480, 360, 240, 144)
+    fun qualityName(h: Int, zero: String = "อัตโนมัติ") = if (h == 0) zero else "${h}p"
     fun applyTheme() = AppCompatDelegate.setDefaultNightMode(when (theme) {
         1 -> AppCompatDelegate.MODE_NIGHT_NO; 2 -> AppCompatDelegate.MODE_NIGHT_YES; else -> AppCompatDelegate.MODE_NIGHT_FOLLOW_SYSTEM
     })

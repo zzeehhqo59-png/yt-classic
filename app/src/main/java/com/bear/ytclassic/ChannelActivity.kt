@@ -25,6 +25,7 @@ fun Context.openChannel(url: String?, name: String, avatar: String?) {
 }
 
 class ChannelActivity : AppCompatActivity() {
+    override fun onResume() { super.onResume(); videos.refreshProgress() }
     private lateinit var url: String
     private var ch: Channel? = null
     private var banner: String? = null

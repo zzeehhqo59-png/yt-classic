@@ -14,6 +14,8 @@ import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.fragment.app.Fragment
 import androidx.lifecycle.lifecycleScope
+import androidx.lifecycle.repeatOnLifecycle
+import coil3.load
 import androidx.recyclerview.widget.ConcatAdapter
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
@@ -159,9 +161,86 @@ class LibraryFragment : Fragment() {
     override fun onViewCreated(view: View, s: Bundle?) {
         view.findViewById<View>(R.id.btnImport).setOnClickListener { picker.launch(arrayOf("*/*")) }
         refreshCount()
+        viewLifecycleOwner.lifecycleScope.launch {
+            viewLifecycleOwner.repeatOnLifecycle(androidx.lifecycle.Lifecycle.State.STARTED) {
+                Downloads.changes.collect { if (!isHidden) refreshDownloads() }
+            }
+        }
     }
 
-    override fun onHiddenChanged(hidden: Boolean) { super.onHiddenChanged(hidden); if (!hidden) refreshCount() }
+    /** การดาวน์โหลด section: every download with its progress; tap a finished one to play it offline. */
+    private fun refreshDownloads() {
+        val view = view ?: return
+        val ctx = requireContext()
+        val list = Downloads.all()
+        val box = view.findViewById<LinearLayout>(R.id.downloads)
+        view.findViewById<TextView>(R.id.downloadsTitle).text = if (list.isEmpty()) "การดาวน์โหลด" else "การดาวน์โหลด (${list.size})"
+        // Progress ticks arrive often: update existing rows in place so an open ⋮ menu or a tap isn't lost.
+        val ids = list.map { it.id }
+        val same = box.childCount == ids.size && ids.indices.all { (box.getChildAt(it).tag as? Downloads.Dl)?.id == ids[it] }
+        if (!same) box.removeAllViews()
+        if (list.isEmpty()) {
+            val t = TextView(ctx).apply {
+                text = "ยังไม่มีวิดีโอที่ดาวน์โหลด\nกดปุ่ม \"ดาวน์โหลด\" ในหน้าวิดีโอหรือในเมนู ⋮ ของวิดีโอ"
+                setTextColor(androidx.core.content.ContextCompat.getColor(ctx, R.color.text2)); textSize = 13f
+                val p = (16 * resources.displayMetrics.density).toInt(); setPadding(p, 0, p, p / 2)
+            }
+            box.addView(t); return
+        }
+        list.forEachIndexed { i, d ->
+            val v = if (same) box.getChildAt(i) else layoutInflater.inflate(R.layout.item_download, box, false).also { nv ->
+                nv.findViewById<ImageView>(R.id.thumb).load(d.thumb)
+                nv.setOnClickListener {
+                    val cur = nv.tag as Downloads.Dl
+                    when (cur.status) {
+                        Downloads.DONE -> ctx.openDownloaded(cur)
+                        Downloads.PAUSED, Downloads.FAILED -> DownloadService.send(ctx, DownloadService.ACTION_START, cur.id)
+                        else -> downloadMenu(it, cur)
+                    }
+                }
+                nv.findViewById<View>(R.id.more).setOnClickListener { downloadMenu(it, nv.tag as Downloads.Dl) }
+                box.addView(nv)
+            }
+            v.tag = d
+            v.findViewById<TextView>(R.id.title).text = d.title
+            v.findViewById<TextView>(R.id.badge).apply { text = if (d.audioOnly) "เสียง" else "${d.height}p" }
+            val bar = v.findViewById<android.widget.ProgressBar>(R.id.progress)
+            bar.isIndeterminate = d.status == Downloads.MERGING
+            bar.progress = d.percent
+            bar.visibility = if (d.status == Downloads.DONE) View.GONE else View.VISIBLE
+            v.findViewById<TextView>(R.id.status).text = when (d.status) {
+                Downloads.QUEUED -> "รอคิวดาวน์โหลด"
+                Downloads.RUNNING -> "กำลังดาวน์โหลด ${d.percent}% · ${Downloads.mb(d.done)} / ${Downloads.mb(d.total)}"
+                Downloads.MERGING -> "กำลังรวมวิดีโอและเสียง…"
+                Downloads.PAUSED -> "หยุดชั่วคราว ${d.percent}% · แตะเพื่อดาวน์โหลดต่อ"
+                Downloads.FAILED -> "ดาวน์โหลดไม่สำเร็จ: ${d.error ?: ""} · แตะเพื่อลองใหม่"
+                else -> "ดาวน์โหลดแล้ว · ${d.quality} · ${Downloads.mb(d.total)} · ดูได้แบบออฟไลน์"
+            }
+        }
+    }
+
+    private fun downloadMenu(anchor: View, d: Downloads.Dl) {
+        val ctx = requireContext()
+        val m = android.widget.PopupMenu(ctx, anchor)
+        val acts = ArrayList<() -> Unit>()
+        fun add(t: String, a: () -> Unit) { m.menu.add(0, acts.size, acts.size, t); acts.add(a) }
+        when (d.status) {
+            Downloads.DONE -> add("เล่น") { ctx.openDownloaded(d) }
+            Downloads.RUNNING, Downloads.QUEUED -> add("หยุดชั่วคราว") { DownloadService.send(ctx, DownloadService.ACTION_PAUSE, d.id) }
+            Downloads.PAUSED, Downloads.FAILED -> add("ดาวน์โหลดต่อ") { DownloadService.send(ctx, DownloadService.ACTION_START, d.id) }
+        }
+        if (d.status == Downloads.DONE) add("ลบไฟล์ที่ดาวน์โหลด") {
+            AlertDialog.Builder(ctx).setMessage("ลบ \"${d.title}\" ออกจากเครื่องใช่ไหม")
+                .setPositiveButton("ลบ") { _, _ -> Downloads.delete(ctx, d.id) }.setNegativeButton("ยกเลิก", null).show()
+        } else if (d.status != Downloads.MERGING) add("ยกเลิกการดาวน์โหลด") {
+            DownloadService.send(ctx, DownloadService.ACTION_CANCEL, d.id)
+        }
+        add("เปิดหน้าวิดีโอออนไลน์") { ctx.openVideo(d.video()) }
+        m.setOnMenuItemClickListener { acts[it.itemId](); true }
+        m.show()
+    }
+
+    override fun onHiddenChanged(hidden: Boolean) { super.onHiddenChanged(hidden); if (!hidden) { refreshCount(); refreshDownloads() } }
     override fun onResume() { super.onResume(); refreshCount() }
 
     private fun row(parent: LinearLayout, icon: Int, title: String, sub: String?, onLong: (() -> Unit)? = null, onClick: () -> Unit) {
