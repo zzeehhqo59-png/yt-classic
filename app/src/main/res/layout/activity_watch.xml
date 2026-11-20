@@ -1,0 +1,12 @@
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android" xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:id="@+id/root" android:layout_width="match_parent" android:layout_height="match_parent" android:orientation="vertical" android:background="#FFFFFF">
+  <FrameLayout android:id="@+id/playerBox" android:layout_width="match_parent" android:layout_height="wrap_content" android:background="#000000">
+    <com.google.android.exoplayer2.ui.StyledPlayerView android:id="@+id/playerView" android:layout_width="match_parent" android:layout_height="match_parent"
+        app:show_shuffle_button="false" app:show_subtitle_button="false" app:show_vr_button="false" app:show_next_button="false" app:show_previous_button="false"
+        app:use_artwork="false" app:show_buffering="always"/>
+    <TextView android:id="@+id/playerError" android:layout_width="match_parent" android:layout_height="match_parent" android:gravity="center" android:padding="20dp"
+        android:background="#E6000000" android:textColor="#FFFFFF" android:textSize="15sp" android:lineSpacingExtra="3dp" android:visibility="gone"/>
+    <ProgressBar android:id="@+id/playerLoading" android:layout_width="40dp" android:layout_height="40dp" android:layout_gravity="center" android:indeterminateTint="#FF0000"/>
+  </FrameLayout>
+  <androidx.recyclerview.widget.RecyclerView android:id="@+id/list" android:layout_width="match_parent" android:layout_height="0dp" android:layout_weight="1"/>
+</LinearLayout>
