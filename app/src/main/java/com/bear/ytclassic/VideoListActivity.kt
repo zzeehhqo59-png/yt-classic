@@ -43,6 +43,7 @@ class VideoListActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
         edgeToEdge(lightBars = true)
         setContentView(R.layout.activity_list)
+        MiniPlayerBar.attach(this)
         findViewById<View>(R.id.root).padForSystemBars()
         mode = intent.getStringExtra("mode") ?: "history"
         plId = intent.getLongExtra("id", 0)

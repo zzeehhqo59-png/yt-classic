@@ -37,7 +37,7 @@ class MainActivity : AppCompatActivity() {
         findViewById<ImageButton>(R.id.btnAccount).setOnClickListener {
             startActivity(Intent(this, SettingsActivity::class.java))
         }
-        setupMini()
+        MiniPlayerBar.attach(this)
         val nav = findViewById<BottomNavigationView>(R.id.bottomNav)
         nav.setOnItemSelectedListener { show(it.itemId); true }
         nav.setOnItemReselectedListener { if (it.itemId == R.id.nav_home) (supportFragmentManager.findFragmentByTag("home") as? HomeFragment)?.scrollTop() }
@@ -47,168 +47,6 @@ class MainActivity : AppCompatActivity() {
             val n = Subs.importOldAppOnce(applicationContext)
             if (n != null && n > 0) Toast.makeText(this@MainActivity, "นำเข้าช่องที่ติดตามจากแอปเดิมแล้ว $n ช่อง", Toast.LENGTH_LONG).show()
         }
-    }
-
-    private lateinit var miniBar: DragFrame
-    private lateinit var miniPlayer: StyledPlayerView
-    private lateinit var miniProgress: ProgressBar
-    private lateinit var miniPlay: ImageButton
-    private lateinit var miniClose: View
-    private lateinit var miniOutline: RoundOutline
-    private var miniAnim: android.animation.ValueAnimator? = null
-    private val ticker = object : Runnable {
-        override fun run() {
-            val p = Playback.player
-            if (p.duration > 0) miniProgress.progress = (p.currentPosition * 1000 / p.duration).toInt()
-            miniProgress.postDelayed(this, 500)
-        }
-    }
-    private val miniListener = object : Player.Listener {
-        override fun onIsPlayingChanged(isPlaying: Boolean) = updatePlayIcon()
-        override fun onPlayWhenReadyChanged(playWhenReady: Boolean, reason: Int) = updatePlayIcon()
-    }
-    private fun updatePlayIcon() { miniPlay.setImageResource(if (Playback.player.playWhenReady) R.drawable.ic_pause else R.drawable.ic_play) }
-
-    private fun setupMini() {
-        miniBar = findViewById(R.id.miniBar)
-        miniPlayer = findViewById(R.id.miniPlayer)
-        miniProgress = findViewById(R.id.miniProgress)
-        miniPlay = findViewById(R.id.miniPlay)
-        miniClose = findViewById(R.id.miniClose)
-        val w = resources.displayMetrics.widthPixels.coerceAtMost(resources.displayMetrics.heightPixels)
-        (miniBar.layoutParams as android.widget.FrameLayout.LayoutParams).apply {
-            width = MiniGeom.width(this@MainActivity, w); height = MiniGeom.height(this@MainActivity, w)
-            marginEnd = MiniGeom.marginEnd(this@MainActivity); bottomMargin = MiniGeom.marginBottom(this@MainActivity)
-        }
-        miniOutline = RoundOutline(MiniGeom.radius(this))
-        miniBar.outlineProvider = miniOutline
-        miniBar.clipToOutline = true
-        miniBar.setOnClickListener { Playback.state.value.item?.let { openVideo(it, expandFrom = 1f) } }
-        setupMiniDrag()
-        miniPlay.setOnClickListener {
-            val p = Playback.player
-            if (p.playbackState == Player.STATE_ENDED) p.seekTo(0)
-            p.playWhenReady = !p.playWhenReady
-        }
-        miniClose.setOnClickListener { Playback.close() }
-        var lastHidden = true
-        lifecycleScope.launch {
-            repeatOnLifecycle(Lifecycle.State.STARTED) {
-                kotlinx.coroutines.flow.combine(Playback.state, Playback.pip, Playback.watchActive) { a, b, c -> Triple(a, b, c) }.collect { (st, pip, watch) ->
-                    val it = st.item
-                    val hidden = pip || watch || it == null
-                    if (hidden) {
-                        // the watch page is expanding over us: keep the card a moment so there is no gap, then let go of the video surface
-                        if (!lastHidden && watch && it != null) miniBar.postDelayed({ if (!miniAllowed()) { miniBar.visibility = View.GONE; miniPlayer.player = null } }, 180)
-                        else { miniBar.visibility = View.GONE; miniPlayer.player = null }
-                    } else {
-                        miniAnim?.cancel(); resetCard()
-                        if (miniPlayer.player == null) miniPlayer.player = Playback.player
-                        miniBar.visibility = View.VISIBLE
-                    }
-                    lastHidden = hidden
-                    if (it != null) {
-                        miniBar.contentDescription = it.title
-                        val thumb = findViewById<ImageView>(R.id.miniThumb)
-                        if (thumb.tag != it.thumb) { thumb.tag = it.thumb; thumb.load(it.thumb) }
-                    }
-                }
-            }
-        }
-    }
-
-    override fun onStart() {
-        super.onStart()
-        if (miniAllowed()) miniPlayer.player = Playback.player
-        Playback.player.addListener(miniListener)
-        updatePlayIcon()
-        miniProgress.post(ticker)
-    }
-
-    private fun miniAllowed() = !Playback.pip.value && !Playback.watchActive.value && Playback.state.value.item != null
-
-    override fun onResume() {
-        super.onResume()
-        // take the video surface back from the watch page that just closed
-        if (miniAllowed()) { miniPlayer.player = null; miniPlayer.player = Playback.player }
-    }
-
-    private val root by lazy { findViewById<View>(R.id.root) }
-
-    private fun resetCard() {
-        miniBar.scaleX = 1f; miniBar.scaleY = 1f; miniBar.translationX = 0f; miniBar.translationY = 0f; miniBar.alpha = 1f
-        miniOutline.radius = MiniGeom.radius(this); miniBar.invalidateOutline()
-        miniPlay.alpha = 1f; miniClose.alpha = 1f; miniProgress.alpha = 1f
-    }
-
-    /** 0 = card in its corner, 1 = grown to the full-width player at the top (same geometry the watch page uses). */
-    private fun setCardProgress(f: Float) {
-        val cw = miniBar.width.toFloat().takeIf { it > 0 } ?: return
-        val scale = 1f + f * (root.width / cw - 1f)
-        miniBar.pivotX = 0f; miniBar.pivotY = 0f
-        miniBar.scaleX = scale; miniBar.scaleY = scale
-        miniBar.translationX = -miniBar.left * f
-        miniBar.translationY = (root.paddingTop - miniBar.top) * f
-        miniOutline.radius = MiniGeom.radius(this) * (1f - f) / scale
-        miniBar.invalidateOutline()
-        val a = (1f - f * 3f).coerceIn(0f, 1f)
-        miniPlay.alpha = a; miniClose.alpha = a; miniProgress.alpha = a
-    }
-
-    /** Card: drag up (follows the finger) to open the watch page, swipe sideways to dismiss, tap to open. */
-    private fun setupMiniDrag() {
-        val d = resources.displayMetrics.density
-        miniBar.direction = -1
-        miniBar.horizontal = true
-        fun range() = (miniBar.top - root.paddingTop).toFloat().coerceAtLeast(200 * d)
-        var f = 0f
-        fun animate(from: Float, to: Float, update: (Float) -> Unit, end: () -> Unit = {}) {
-            miniAnim?.cancel()
-            miniAnim = android.animation.ValueAnimator.ofFloat(from, to).apply {
-                duration = 220
-                interpolator = android.view.animation.DecelerateInterpolator(1.6f)
-                addUpdateListener { update(it.animatedValue as Float) }
-                addListener(object : android.animation.AnimatorListenerAdapter() {
-                    var cancelled = false
-                    override fun onAnimationCancel(a: android.animation.Animator) { cancelled = true }
-                    override fun onAnimationEnd(a: android.animation.Animator) { if (!cancelled) end() }
-                })
-                start()
-            }
-        }
-        miniBar.listener = object : DragFrame.Listener {
-            override fun onDragStart() { miniAnim?.cancel() }
-            override fun onDrag(dy: Float) { f = (-dy / range()).coerceIn(0f, 1f); setCardProgress(f) }
-            override fun onDragEnd(velocityY: Float) {
-                val item = Playback.state.value.item
-                if (item != null && (f > 0.5f || velocityY < -600 * d)) {
-                    openVideo(item, expandFrom = (1f - f).coerceIn(0.02f, 1f))
-                } else animate(f, 0f, { f = it; setCardProgress(it) })
-            }
-            override fun onDragX(dx: Float) {
-                miniAnim?.cancel()
-                miniBar.translationX = dx
-                miniBar.alpha = (1f - kotlin.math.abs(dx) / (miniBar.width * 1.1f)).coerceIn(0.1f, 1f)
-            }
-            override fun onDragXEnd(velocityX: Float) {
-                val dx = miniBar.translationX
-                val w = miniBar.width.toFloat()
-                val away = kotlin.math.abs(dx) > w * 0.35f || kotlin.math.abs(velocityX) > 800 * d
-                if (away) {
-                    val sign = if (dx != 0f) kotlin.math.sign(dx) else kotlin.math.sign(velocityX)
-                    animate(dx, sign * (w + miniBar.left), { miniBar.translationX = it; miniBar.alpha = (1f - kotlin.math.abs(it) / (w * 1.1f)).coerceIn(0f, 1f) }) {
-                        Playback.close()
-                    }
-                } else animate(dx, 0f, { miniBar.translationX = it; miniBar.alpha = (1f - kotlin.math.abs(it) / (w * 1.1f)).coerceIn(0.1f, 1f) })
-            }
-        }
-    }
-
-    override fun onStop() {
-        super.onStop()
-        miniProgress.removeCallbacks(ticker)
-        Playback.player.removeListener(miniListener)
-        miniPlayer.player = null
     }
 
     override fun onNewIntent(intent: Intent) { super.onNewIntent(intent); handleTab(intent) }
@@ -247,8 +85,9 @@ fun android.content.Context.openVideo(v: VideoItem, expandFrom: Float = -1f) {
         .addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP)
     if (expandFrom > 0f) i.putExtra(WatchActivity.EXTRA_EXPAND_FROM, expandFrom)
     startActivity(i)
+    // no slide: the watch page appears in place (and grows out of the mini bar when expanding)
     @Suppress("DEPRECATION")
-    if (expandFrom > 0f) (this as? android.app.Activity)?.overridePendingTransition(0, 0)
+    (this as? android.app.Activity)?.overridePendingTransition(0, 0)
 }
 
 class HomeFragment : Fragment() {

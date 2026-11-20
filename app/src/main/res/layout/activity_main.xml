@@ -12,25 +12,11 @@
         android:src="@drawable/ic_account" android:contentDescription="@string/account"/>
   </LinearLayout>
   <FrameLayout android:id="@+id/container" android:layout_width="match_parent" android:layout_height="0dp" android:layout_weight="1"/>
+  <include layout="@layout/view_mini_bar"/>
   <View android:layout_width="match_parent" android:layout_height="1dp" android:background="@color/divider"/>
   <com.google.android.material.bottomnavigation.BottomNavigationView android:id="@+id/bottomNav"
       android:layout_width="match_parent" android:layout_height="56dp" android:background="@color/bg"
       app:menu="@menu/bottom_nav" app:itemIconTint="@color/nav_tint" app:itemTextColor="@color/nav_tint"
       app:labelVisibilityMode="labeled" app:elevation="0dp" app:itemTextAppearanceActive="@style/NavText" app:itemTextAppearanceInactive="@style/NavText"/>
 </LinearLayout>
-  <!-- floating mini player card (bottom-right, above the bottom nav); size/position set in code via MiniGeom -->
-  <com.bear.ytclassic.DragFrame android:id="@+id/miniBar" android:layout_width="200dp" android:layout_height="112dp"
-      android:layout_gravity="bottom|end" android:background="@drawable/bg_mini_card" android:elevation="8dp" android:visibility="gone" android:focusable="true"
-      android:contentDescription="เปิดวิดีโอเต็มหน้า">
-    <ImageView android:id="@+id/miniThumb" android:layout_width="match_parent" android:layout_height="match_parent" android:scaleType="centerCrop" android:importantForAccessibility="no"/>
-    <com.google.android.exoplayer2.ui.StyledPlayerView android:id="@+id/miniPlayer" android:layout_width="match_parent" android:layout_height="match_parent"
-        app:use_controller="false" app:resize_mode="zoom" app:surface_type="texture_view" app:shutter_background_color="#00000000"/>
-    <View android:layout_width="match_parent" android:layout_height="match_parent" android:background="@drawable/bg_mini_scrim"/>
-    <ImageButton android:id="@+id/miniPlay" android:layout_width="40dp" android:layout_height="40dp" android:layout_gravity="bottom|start" android:layout_margin="2dp"
-        android:background="@drawable/bg_mini_btn" android:src="@drawable/ic_pause" app:tint="#FFFFFF" android:padding="8dp" android:scaleType="fitCenter" android:contentDescription="เล่นหรือหยุดชั่วคราว"/>
-    <ImageButton android:id="@+id/miniClose" android:layout_width="36dp" android:layout_height="36dp" android:layout_gravity="top|end" android:layout_margin="2dp"
-        android:background="@drawable/bg_mini_btn" android:src="@drawable/ic_close" app:tint="#FFFFFF" android:padding="8dp" android:scaleType="fitCenter" android:contentDescription="ปิด"/>
-    <ProgressBar android:id="@+id/miniProgress" style="?android:attr/progressBarStyleHorizontal" android:layout_width="match_parent" android:layout_height="3dp"
-        android:layout_gravity="bottom" android:progressTint="#FF0000" android:progressBackgroundTint="#66FFFFFF" android:max="1000"/>
-  </com.bear.ytclassic.DragFrame>
 </FrameLayout>

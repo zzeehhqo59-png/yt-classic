@@ -111,20 +111,6 @@ fun Activity.setTranslucentCompat(translucent: Boolean) {
     } catch (_: Throwable) { }
 }
 
-/**
- * Where the floating mini player card sits (bottom-right, above the bottom nav), shared by the home screen
- * and the watch page so the shrinking video lands exactly on the card.
- */
-object MiniGeom {
-    private fun d(c: Context) = c.resources.displayMetrics.density
-    fun width(c: Context, screenW: Int) = (screenW * 0.48f).toInt()
-    fun height(c: Context, screenW: Int) = width(c, screenW) * 9 / 16
-    fun marginEnd(c: Context) = (8 * d(c)).toInt()
-    /** Gap between the card and the bottom of the padded root: bottom nav 56dp + divider 1dp + 8dp. */
-    fun marginBottom(c: Context) = (65 * d(c)).toInt()
-    fun radius(c: Context) = 12 * d(c)
-}
-
 /** Rounded corners for a view, radius changeable while animating. */
 class RoundOutline(var radius: Float) : android.view.ViewOutlineProvider() {
     override fun getOutline(view: android.view.View, outline: android.graphics.Outline) {

@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 3.0.1-style mini player: full-width black bar above the bottom nav (or at the bottom of other screens). Shown/hidden by MiniPlayerBar. -->
+<com.bear.ytclassic.DragFrame xmlns:android="http://schemas.android.com/apk/res/android" xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:id="@+id/miniBar" android:layout_width="match_parent" android:layout_height="56dp" android:background="#000000" android:elevation="6dp"
+    android:visibility="gone" android:focusable="true" android:contentDescription="เปิดวิดีโอเต็มหน้า">
+  <LinearLayout android:layout_width="match_parent" android:layout_height="match_parent" android:orientation="horizontal" android:gravity="center_vertical">
+    <FrameLayout android:layout_width="100dp" android:layout_height="match_parent" android:background="#000000">
+      <ImageView android:id="@+id/miniThumb" android:layout_width="match_parent" android:layout_height="match_parent" android:scaleType="centerCrop" android:importantForAccessibility="no"/>
+      <com.google.android.exoplayer2.ui.StyledPlayerView android:id="@+id/miniPlayer" android:layout_width="match_parent" android:layout_height="match_parent"
+          app:use_controller="false" app:resize_mode="zoom" app:surface_type="texture_view" app:shutter_background_color="#00000000"/>
+    </FrameLayout>
+    <LinearLayout android:layout_width="0dp" android:layout_weight="1" android:layout_height="wrap_content" android:orientation="vertical" android:paddingStart="12dp" android:paddingEnd="4dp">
+      <TextView android:id="@+id/miniTitle" android:layout_width="match_parent" android:layout_height="wrap_content" android:maxLines="1" android:ellipsize="end" android:textColor="#FFFFFF" android:textSize="14sp"/>
+      <TextView android:id="@+id/miniChannel" android:layout_width="match_parent" android:layout_height="wrap_content" android:maxLines="1" android:ellipsize="end" android:textColor="#AAAAAA" android:textSize="12sp"/>
+    </LinearLayout>
+    <ImageButton android:id="@+id/miniPlay" android:layout_width="48dp" android:layout_height="48dp" android:background="?attr/selectableItemBackgroundBorderless"
+        android:src="@drawable/ic_pause" app:tint="#FFFFFF" android:contentDescription="เล่นหรือหยุดชั่วคราว"/>
+    <ImageButton android:id="@+id/miniClose" android:layout_width="48dp" android:layout_height="48dp" android:background="?attr/selectableItemBackgroundBorderless"
+        android:src="@drawable/ic_close" app:tint="#FFFFFF" android:contentDescription="ปิด"/>
+  </LinearLayout>
+  <ProgressBar android:id="@+id/miniProgress" style="?android:attr/progressBarStyleHorizontal" android:layout_width="match_parent" android:layout_height="2dp"
+      android:layout_gravity="bottom" android:progressDrawable="@drawable/mini_progress" android:max="1000"/>
+</com.bear.ytclassic.DragFrame>

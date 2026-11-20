@@ -35,6 +35,9 @@ class WatchActivity : AppCompatActivity() {
         const val EXTRA_EXPAND_FROM = "expand_from"
         /** Path of a downloaded file to play offline. */
         const val EXTRA_FILE = "file"
+        private const val MINI_THUMB_DP = 100f
+        private const val MINI_BAR_DP = 56f
+        private const val NAV_DP = 56f
     }
 
     private lateinit var item: VideoItem
@@ -211,30 +214,32 @@ class WatchActivity : AppCompatActivity() {
 
     // ---- drag to minimize ----
     private fun dp(v: Float) = v * resources.displayMetrics.density
-    /** Floating card rect (in root coordinates) the video shrinks into: bottom-right, above the home screen's bottom nav. */
-    private fun cardW() = MiniGeom.width(this, playerBox.width.coerceAtLeast(1)).toFloat()
-    private fun cardLeft() = playerBox.width - MiniGeom.marginEnd(this) - cardW()
-    private fun cardTop() = root.height - root.paddingBottom - MiniGeom.marginBottom(this) - MiniGeom.height(this, playerBox.width.coerceAtLeast(1)).toFloat()
-    /** Vertical distance the video travels from its place at the top to the card. */
-    private fun range(): Float = (cardTop() - playerBox.top).coerceAtLeast(dp(100f))
-    private val playerOutline by lazy { RoundOutline(0f).also { playerBox.outlineProvider = it } }
+    /** Top of the mini bar on the screen below (root coordinates): measured by [MiniTarget], else home's spot above the bottom nav. */
+    private fun barTop(): Float {
+        val gap = MiniTarget.gapFromBottomPx
+        return if (gap > 0) root.height - gap.toFloat() else root.height - root.paddingBottom - dp(MINI_BAR_DP + NAV_DP + 1f)
+    }
+    /** Vertical distance the video travels from its place at the top to the mini bar. */
+    private fun range(): Float = (barTop() - playerBox.top).coerceAtLeast(dp(100f))
 
-    /** 0 = full watch page, 1 = only the video left, shrunk into the bottom-right card; details fade, the screen below shows through. */
+    /**
+     * 0 = full watch page, 1 = only the video left, shrunk to the mini bar's 100dp thumbnail (3.0.1 style).
+     * The black background and the details fade with the drag, so the previous screen shows through gradually.
+     */
     private fun setProgress(p: Float) {
         progress = p.coerceIn(0f, 1f)
         val w = playerBox.width.toFloat().coerceAtLeast(1f)
-        val sc = 1f - progress * (1f - cardW() / w)
+        val sc = 1f - progress * (1f - dp(MINI_THUMB_DP) / w)
         playerBox.pivotX = 0f; playerBox.pivotY = 0f
         playerBox.scaleX = sc; playerBox.scaleY = sc
-        playerBox.translationX = progress * cardLeft()
+        playerBox.translationX = 0f
         playerBox.translationY = progress * range()
-        playerOutline.radius = MiniGeom.radius(this) * progress / sc
         // clip only while shrinking: at rest the scrubber knob may overhang the video's bottom edge
         playerBox.clipToOutline = progress > 0f
         playerBox.invalidateOutline()
         ctl.seek.alpha = if (progress > 0f) 0f else 1f
-        list.alpha = (1f - progress * 1.8f).coerceIn(0f, 1f)
-        list.translationY = progress * dp(120f)
+        list.alpha = 1f - progress
+        list.translationY = progress * dp(160f)
         rootBg.alpha = ((1f - progress) * 255).toInt()
     }
 

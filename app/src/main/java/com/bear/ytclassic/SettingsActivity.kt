@@ -24,6 +24,7 @@ class SettingsActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
         edgeToEdge(lightBars = true)
         setContentView(R.layout.activity_settings)
+        MiniPlayerBar.attach(this)
         findViewById<View>(R.id.root).padForSystemBars()
         findViewById<View>(R.id.btnBack).setOnClickListener { finish() }
         list = findViewById(R.id.list)

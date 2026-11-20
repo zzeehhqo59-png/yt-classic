@@ -38,6 +38,7 @@ class ChannelActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
         edgeToEdge(lightBars = true)
         setContentView(R.layout.activity_channel)
+        MiniPlayerBar.attach(this)
         findViewById<View>(R.id.root).padForSystemBars()
         url = intent.getStringExtra("url")!!
         ch = Channel(url, intent.getStringExtra("name").orEmpty(), intent.getStringExtra("avatar"))

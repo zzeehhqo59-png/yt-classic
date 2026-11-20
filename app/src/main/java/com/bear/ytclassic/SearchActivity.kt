@@ -41,6 +41,7 @@ class SearchActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
         edgeToEdge(lightBars = true)
         setContentView(R.layout.activity_search)
+        MiniPlayerBar.attach(this)
         findViewById<View>(R.id.root).padForSystemBars()
         query = findViewById(R.id.query)
         suggestions = findViewById(R.id.suggestions)
