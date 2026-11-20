@@ -54,4 +54,11 @@ class LogicTest {
         assertEquals("Marques Brownlee", Fmt.channelLabel("Marques Brownlee", "https://www.youtube.com/channel/UCBJycsmduvYEL83R_U4JriQ"))
         assertEquals("ช่อง", Fmt.channelLabel("ช่อง", null))
     }
+
+    @Test fun likeMessages() {
+        assertEquals("เพิ่มในวิดีโอที่ชอบแล้ว", Likes.message(Likes.LIKE, Likes.LIKE))
+        assertEquals("คุณไม่ชอบวิดีโอนี้", Likes.message(Likes.DISLIKE, Likes.DISLIKE))
+        assertEquals("นำออกจากวิดีโอที่ชอบแล้ว", Likes.message(0, Likes.LIKE))
+        assertEquals("ยกเลิกการไม่ชอบแล้ว", Likes.message(0, Likes.DISLIKE))
+    }
 }

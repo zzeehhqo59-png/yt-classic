@@ -24,6 +24,14 @@ object Likes {
         return next
     }
 
+    /** Toast after tapping 👍 / 👎. [now] is the state after the tap, [tapped] is which button was pressed. */
+    fun message(now: Int, tapped: Int): String = when {
+        now == LIKE -> "เพิ่มในวิดีโอที่ชอบแล้ว"
+        now == DISLIKE -> "คุณไม่ชอบวิดีโอนี้"
+        tapped == LIKE -> "นำออกจากวิดีโอที่ชอบแล้ว"
+        else -> "ยกเลิกการไม่ชอบแล้ว"
+    }
+
     fun liked(): List<VideoItem> = Db.r.rawQuery("SELECT ${Db.VCOLS} FROM likes WHERE value=1 ORDER BY at DESC", null).use { c ->
         buildList { while (c.moveToNext()) add(Db.video(c)) }
     }

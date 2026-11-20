@@ -13,6 +13,7 @@ import android.view.WindowManager
 import android.widget.FrameLayout
 import android.widget.TextView
 import androidx.activity.OnBackPressedCallback
+import androidx.activity.viewModels
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
@@ -35,11 +36,9 @@ class WatchActivity : AppCompatActivity() {
         const val EXTRA_EXPAND_FROM = "expand_from"
         /** Path of a downloaded file to play offline. */
         const val EXTRA_FILE = "file"
-        private const val MINI_THUMB_DP = 100f
-        private const val MINI_BAR_DP = 56f
-        private const val NAV_DP = 56f
     }
 
+    private val vm: WatchViewModel by viewModels()
     private lateinit var item: VideoItem
     private val player get() = Playback.player
     private lateinit var playerView: StyledPlayerView
@@ -47,10 +46,7 @@ class WatchActivity : AppCompatActivity() {
     private lateinit var errorBox: View
     private lateinit var root: View
     private lateinit var rootBg: android.graphics.drawable.Drawable
-    private var progress = 0f
-    private var anim: android.animation.ValueAnimator? = null
-    private var expanding = false
-    private var leaving = false
+    private lateinit var shrink: WatchMinimize
     private lateinit var playerError: TextView
     private lateinit var playerLoading: View
     private lateinit var btnMinimize: View
@@ -67,8 +63,6 @@ class WatchActivity : AppCompatActivity() {
     private lateinit var ctl: WatchControls
     private val related = VideoAdapter(true) { openVideo(it) }
     private var boundInfo: StreamInfo? = null
-    private val qualities get() = Playback.qualities
-    private val live get() = Playback.live
     private var inPip = false
     private val pipListener = object : Player.Listener {
         override fun onIsPlayingChanged(isPlaying: Boolean) = updatePipParams()
@@ -97,12 +91,20 @@ class WatchActivity : AppCompatActivity() {
         list = findViewById(R.id.list)
         list.layoutManager = LinearLayoutManager(this)
         list.adapter = ConcatAdapter(header, related)
-        setupDrag()
+        shrink = WatchMinimize(
+            root, rootBg, playerBox, list, resources.displayMetrics.density,
+            hideControls = { ctl.show(false, animate = false) },
+            setSeekAlpha = { ctl.seek.alpha = it },
+            isLandscape = { isLandscape() },
+            inPip = { inPip },
+            onFinished = { finishToMini() },
+        )
+        shrink.setup()
 
-        btnMinimize.setOnClickListener { minimize() }
+        btnMinimize.setOnClickListener { shrink.minimize() }
         ctl = WatchControls(this, playerView, playerBox, object : WatchControls.Host {
             override val inPip get() = this@WatchActivity.inPip
-            override val collapsed get() = progress > 0f
+            override val collapsed get() = shrink.progress > 0f
             override fun isLandscape() = this@WatchActivity.isLandscape()
             override fun onControlsVisibility() = updateMinimizeButton()
             override fun openComments() = this@WatchActivity.openComments()
@@ -116,20 +118,18 @@ class WatchActivity : AppCompatActivity() {
         ctl.setupGestures()
         onBackPressedDispatcher.addCallback(this, object : OnBackPressedCallback(true) {
             override fun handleOnBackPressed() {
-                if (isLandscape()) runCatching { requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_PORTRAIT } else minimize()
+                if (isLandscape()) runCatching { requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_PORTRAIT } else shrink.minimize()
             }
         })
         applyLayout(resources.configuration)
         if (!handleIntent(intent)) { finish(); return }
         val from = intent.getFloatExtra(EXTRA_EXPAND_FROM, -1f)
         if (from > 0f && savedInstanceState == null && !isLandscape()) {
-            expanding = true
-            playerBox.alpha = 0f
-            root.post { playerBox.alpha = 1f; setProgress(from); animateTo(0f) { expanding = false; setTranslucentCompat(false) } }
+            shrink.expandFrom(from) { setTranslucentCompat(false) }
         }
         lifecycleScope.launch {
             repeatOnLifecycle(Lifecycle.State.STARTED) {
-                Playback.state.collect { render(it) }
+                vm.ui.collect { render(it) }
             }
         }
     }
@@ -143,31 +143,36 @@ class WatchActivity : AppCompatActivity() {
     /** Video from the intent, or (from the notification) the one already playing. */
     private fun handleIntent(i: Intent): Boolean {
         @Suppress("DEPRECATION")
-        val v = i.getSerializableExtra(EXTRA_ITEM) as? VideoItem ?: Playback.state.value.item ?: return false
-        item = v
+        val raw = i.getSerializableExtra(EXTRA_ITEM) as? VideoItem
         val file = i.getStringExtra(EXTRA_FILE)?.let { java.io.File(it) }
-        if (file != null) {
-            if (Playback.state.value.item?.url != v.url || !Playback.offline) {
+        val opened = vm.planOpen(raw, file) ?: return false
+        val v = opened.first
+        val kind = opened.second
+        item = v
+        when (kind) {
+            WatchViewModel.OpenKind.NewFile -> {
                 boundInfo = null; comments.reset()
                 header.reset(); header.bindItem(v); header.setComments(null, null, null)
                 related.set(emptyList())
-                Playback.openFile(v, file)
             }
-        } else if (Playback.state.value.item?.url == v.url) {
-            // page re-created for the video already playing (e.g. opened from the mini player): show its details now
-            if (boundInfo == null) Playback.state.value.let { st -> if (st.info != null) { boundInfo = st.info; header.bindInfo(st.info); related.set(st.info.relatedItems.videosOnly()) } else header.bindItem(st.item ?: v) }
-        } else if (Playback.state.value.item?.url != v.url) {
-            boundInfo = null
-            header.reset()
-            header.bindItem(v)
-            related.set(emptyList())
-            Playback.open(v)
+            WatchViewModel.OpenKind.NewStream -> {
+                boundInfo = null
+                header.reset()
+                header.bindItem(v)
+                related.set(emptyList())
+            }
+            WatchViewModel.OpenKind.Reuse -> {
+                // page re-created for the video already playing (e.g. opened from the mini player): show its details now
+                if (boundInfo == null) Playback.state.value.let { st -> if (st.info != null) { boundInfo = st.info; header.bindInfo(st.info); related.set(st.info.relatedItems.videosOnly()) } else header.bindItem(st.item ?: v) }
+            }
+            WatchViewModel.OpenKind.Unchanged -> {}
         }
+        vm.applyOpen(v, file, kind)
         list.scrollToPosition(0)
         return true
     }
 
-    private fun render(st: Playback.State) {
+    private fun render(st: WatchUiState) {
         val it = st.item ?: run { if (!isFinishing) finish(); return }
         item = it
         if (st.info !== boundInfo) {
@@ -189,18 +194,9 @@ class WatchActivity : AppCompatActivity() {
         ctl.renderItem(it)
     }
 
-
     /** 👍 / 👎 on this phone: liked videos are listed on the คุณ tab. */
     private fun rate(value: Int) {
-        val v = Playback.state.value.item?.takeIf { it.url == item.url } ?: item
-        val now = Likes.toggle(v, value)
-        val msg = when {
-            now == Likes.LIKE -> "เพิ่มในวิดีโอที่ชอบแล้ว"
-            now == Likes.DISLIKE -> "คุณไม่ชอบวิดีโอนี้"
-            value == Likes.LIKE -> "นำออกจากวิดีโอที่ชอบแล้ว"
-            else -> "ยกเลิกการไม่ชอบแล้ว"
-        }
-        android.widget.Toast.makeText(this, msg, android.widget.Toast.LENGTH_SHORT).show()
+        android.widget.Toast.makeText(this, vm.rate(item, value), android.widget.Toast.LENGTH_SHORT).show()
         header.notifyItemChanged(0); ctl.updateRating()
     }
 
@@ -212,82 +208,9 @@ class WatchActivity : AppCompatActivity() {
         btnMinimize.visibility = if ((ctl.shown || stateBlocking) && !isLandscape() && !inPip) View.VISIBLE else View.GONE
     }
 
-    // ---- drag to minimize ----
-    private fun dp(v: Float) = v * resources.displayMetrics.density
-    /** Top of the mini bar on the screen below (root coordinates): measured by [MiniTarget], else home's spot above the bottom nav. */
-    private fun barTop(): Float {
-        val gap = MiniTarget.gapFromBottomPx
-        return if (gap > 0) root.height - gap.toFloat() else root.height - root.paddingBottom - dp(MINI_BAR_DP + NAV_DP + 1f)
-    }
-    /** Vertical distance the video travels from its place at the top to the mini bar. */
-    private fun range(): Float = (barTop() - playerBox.top).coerceAtLeast(dp(100f))
-
-    /**
-     * 0 = full watch page, 1 = only the video left, shrunk to the mini bar's 100dp thumbnail (3.0.1 style).
-     * The black background and the details fade with the drag, so the previous screen shows through gradually.
-     */
-    private fun setProgress(p: Float) {
-        progress = p.coerceIn(0f, 1f)
-        val w = playerBox.width.toFloat().coerceAtLeast(1f)
-        val sc = 1f - progress * (1f - dp(MINI_THUMB_DP) / w)
-        playerBox.pivotX = 0f; playerBox.pivotY = 0f
-        playerBox.scaleX = sc; playerBox.scaleY = sc
-        playerBox.translationX = 0f
-        playerBox.translationY = progress * range()
-        // clip only while shrinking: at rest the scrubber knob may overhang the video's bottom edge
-        playerBox.clipToOutline = progress > 0f
-        playerBox.invalidateOutline()
-        ctl.seek.alpha = if (progress > 0f) 0f else 1f
-        list.alpha = 1f - progress
-        list.translationY = progress * dp(160f)
-        rootBg.alpha = ((1f - progress) * 255).toInt()
-    }
-
-    private fun animateTo(target: Float, end: () -> Unit) {
-        anim?.cancel()
-        anim = android.animation.ValueAnimator.ofFloat(progress, target).apply {
-            duration = (220 + 160 * kotlin.math.abs(target - progress)).toLong()
-            interpolator = android.view.animation.DecelerateInterpolator(1.6f)
-            addUpdateListener { setProgress(it.animatedValue as Float) }
-            addListener(object : android.animation.AnimatorListenerAdapter() {
-                var cancelled = false
-                override fun onAnimationCancel(a: android.animation.Animator) { cancelled = true }
-                override fun onAnimationEnd(a: android.animation.Animator) { if (!cancelled) end() }
-            })
-            start()
-        }
-    }
-
-    private fun canDrag() = !isLandscape() && !inPip && !leaving
-
-    private fun setupDrag() {
-        playerBox.canDrag = { canDrag() }
-        playerBox.listener = object : DragFrame.Listener {
-            override fun onDragStart() { anim?.cancel(); beginCollapse() }
-            override fun onDrag(dy: Float) = setProgress(dy / range())
-            override fun onDragEnd(velocityY: Float) {
-                if (progress > 0.5f || velocityY > dp(600f)) animateTo(1f) { finishToMini() }
-                else animateTo(0f) { setTranslucentCompat(false) }
-            }
-        }
-    }
-
-    private fun beginCollapse() {
-        ctl.show(false, animate = false)
-        setTranslucentCompat(true)
-    }
-
-    /** ˅ button / back: animate down into the mini player. */
-    private fun minimize() {
-        if (leaving) return
-        if (!canDrag() || root.height == 0) { finishToMini(); return }
-        beginCollapse()
-        animateTo(1f) { finishToMini() }
-    }
-
     private fun finishToMini() {
-        if (leaving) return
-        leaving = true
+        if (shrink.leaving) return
+        shrink.leaving = true
         Playback.watchActive.value = false
         if (isTaskRoot) startActivityNoTransition(Intent(this, MainActivity::class.java))
         finish()
@@ -300,7 +223,7 @@ class WatchActivity : AppCompatActivity() {
 
     override fun onEnterAnimationComplete() {
         super.onEnterAnimationComplete()
-        if (!expanding && progress == 0f) setTranslucentCompat(false)
+        if (!shrink.expanding && shrink.progress == 0f) setTranslucentCompat(false)
     }
 
     override fun onStart() {
@@ -412,7 +335,6 @@ class WatchActivity : AppCompatActivity() {
         } else ctl.show(WindowInsetsCompat.Type.systemBars())
     }
 
-
     private fun toggleFullscreen() {
         runCatching {
             requestedOrientation = if (isLandscape()) ActivityInfo.SCREEN_ORIENTATION_PORTRAIT else ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE
@@ -420,7 +342,7 @@ class WatchActivity : AppCompatActivity() {
     }
 
     private fun moreSheet() = videoActionSheet(item) {
-        Downloads.start(this, item, boundInfo?.takeIf { it.url == item.url || Playback.state.value.item?.url == item.url })
+        Downloads.start(this, item, vm.downloadInfo(item))
     }
 
 }
