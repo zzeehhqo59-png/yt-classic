@@ -18,12 +18,12 @@ object Db {
     private const val VDEF = "url TEXT NOT NULL, title TEXT, channel TEXT, channel_url TEXT, thumb TEXT, avatar TEXT, duration INTEGER, views INTEGER, uploaded_ms INTEGER"
 
     fun init(c: Context) {
-        helper = object : SQLiteOpenHelper(c.applicationContext, "ytclassic.db", null, 4) {
+        helper = object : SQLiteOpenHelper(c.applicationContext, "ytclassic.db", null, 5) {
             override fun onCreate(db: SQLiteDatabase) {
                 db.execSQL("CREATE TABLE subs (url TEXT PRIMARY KEY, name TEXT NOT NULL, avatar TEXT, subscribers INTEGER NOT NULL DEFAULT -1, added INTEGER NOT NULL)")
                 createV2(db); createV3(db); createV4(db)
             }
-            override fun onUpgrade(db: SQLiteDatabase, o: Int, n: Int) { if (o < 2) createV2(db); if (o < 3) createV3(db); if (o < 4) createV4(db) }
+            override fun onUpgrade(db: SQLiteDatabase, o: Int, n: Int) { if (o < 2) createV2(db); if (o < 3) createV3(db); if (o < 4) createV4(db); if (o in 2..4) rekeyHistory(db) }
         }
     }
 
@@ -33,8 +33,24 @@ object Db {
         db.execSQL("CREATE TABLE IF NOT EXISTS unavailable (url TEXT PRIMARY KEY, kind INTEGER NOT NULL, at INTEGER NOT NULL)")
     }
 
+    /** History, one row per video (url). */
+    fun historyDdl(table: String) = "CREATE TABLE $table ($VDEF, watched_at INTEGER NOT NULL, position_ms INTEGER NOT NULL DEFAULT 0, " +
+        "length_ms INTEGER NOT NULL DEFAULT 0, watch_count INTEGER NOT NULL DEFAULT 1, PRIMARY KEY(url))"
+
+    /**
+     * 5.0.1: before v5 the history table was created with "$VDEF PRIMARY KEY", which made uploaded_ms (the last column)
+     * the primary key. Two rows with the same upload time (0, or the same day) then made History.record throw
+     * "UNIQUE constraint failed: history.uploaded_ms" and crash. Rebuild it keyed by url, keeping the newest row per video.
+     */
+    private fun rekeyHistory(db: SQLiteDatabase) {
+        db.execSQL(historyDdl("history_v5"))
+        db.execSQL("INSERT OR IGNORE INTO history_v5 SELECT $VCOLS, watched_at, position_ms, length_ms, watch_count FROM history ORDER BY watched_at DESC")
+        db.execSQL("DROP TABLE history")
+        db.execSQL("ALTER TABLE history_v5 RENAME TO history")
+    }
+
     private fun createV2(db: SQLiteDatabase) {
-        db.execSQL("CREATE TABLE history ($VDEF PRIMARY KEY, watched_at INTEGER NOT NULL, position_ms INTEGER NOT NULL DEFAULT 0, length_ms INTEGER NOT NULL DEFAULT 0, watch_count INTEGER NOT NULL DEFAULT 1)")
+        db.execSQL(historyDdl("history"))
         db.execSQL("CREATE TABLE playlists (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL, created INTEGER NOT NULL)")
         db.execSQL("CREATE TABLE playlist_items (playlist_id INTEGER NOT NULL, $VDEF, added INTEGER NOT NULL, PRIMARY KEY(playlist_id, url))")
         db.execSQL("INSERT INTO playlists (id, name, created) VALUES (${Playlists.WATCH_LATER}, 'ดูภายหลัง', 0)")
@@ -65,7 +81,8 @@ object History {
         val now = System.currentTimeMillis()
         val cv = Db.values(v).apply { put("watched_at", now) }
         val db = Db.w
-        if (db.update("history", ContentValues(cv).apply { remove("url") }, "url=?", arrayOf(v.url)) > 0) {
+        val upd = ContentValues(cv).apply { remove("url"); if (v.uploadedMs <= 0) remove("uploaded_ms") }
+        if (db.update("history", upd, "url=?", arrayOf(v.url)) > 0) {
             db.execSQL("UPDATE history SET watch_count = watch_count + 1 WHERE url=?", arrayOf(v.url))
         } else db.insert("history", null, cv)
         version++
