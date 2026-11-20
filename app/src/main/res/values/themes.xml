@@ -14,6 +14,8 @@
     <item name="android:textColorSecondary">@color/text2</item>
     <item name="colorSurface">@color/surface</item>
     <item name="colorOnSurface">@color/text1</item>
+    <!-- no right-to-left activity slide (Android 14+ / XOS ignore overridePendingTransition) -->
+    <item name="android:windowAnimationStyle">@style/NoActivityAnimation</item>
   </style>
   <style name="Theme.YTClassic.Watch" parent="Theme.YTClassic">
     <item name="android:statusBarColor">@android:color/transparent</item>
@@ -25,14 +27,14 @@
     <item name="android:windowAnimationStyle">@style/NoActivityAnimation</item>
   </style>
   <style name="NoActivityAnimation" parent="@android:style/Animation.Activity">
-    <item name="android:activityOpenEnterAnimation">@null</item>
-    <item name="android:activityOpenExitAnimation">@null</item>
-    <item name="android:activityCloseEnterAnimation">@null</item>
-    <item name="android:activityCloseExitAnimation">@null</item>
-    <item name="android:taskOpenEnterAnimation">@null</item>
-    <item name="android:taskOpenExitAnimation">@null</item>
-    <item name="android:taskCloseEnterAnimation">@null</item>
-    <item name="android:taskCloseExitAnimation">@null</item>
+    <item name="android:activityOpenEnterAnimation">@anim/no_anim</item>
+    <item name="android:activityOpenExitAnimation">@anim/no_anim</item>
+    <item name="android:activityCloseEnterAnimation">@anim/no_anim</item>
+    <item name="android:activityCloseExitAnimation">@anim/no_anim</item>
+    <item name="android:taskOpenEnterAnimation">@anim/no_anim</item>
+    <item name="android:taskOpenExitAnimation">@anim/no_anim</item>
+    <item name="android:taskCloseEnterAnimation">@anim/no_anim</item>
+    <item name="android:taskCloseExitAnimation">@anim/no_anim</item>
   </style>
   <style name="NavText" parent="TextAppearance.MaterialComponents.Caption"><item name="android:textSize">11sp</item></style>
   <style name="WatchAction"><item name="android:layout_width">0dp</item><item name="android:layout_weight">1</item><item name="android:layout_height">wrap_content</item><item name="android:gravity">center</item><item name="android:drawablePadding">4dp</item><item name="android:textColor">@color/text2</item><item name="android:textSize">12sp</item><item name="android:drawableTint">@color/icon</item><item name="android:background">?attr/selectableItemBackgroundBorderless</item><item name="android:paddingTop">4dp</item><item name="android:paddingBottom">4dp</item></style>

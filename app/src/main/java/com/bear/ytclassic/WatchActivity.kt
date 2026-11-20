@@ -289,10 +289,13 @@ class WatchActivity : AppCompatActivity() {
         if (leaving) return
         leaving = true
         Playback.watchActive.value = false
-        if (isTaskRoot) startActivity(Intent(this, MainActivity::class.java))
+        if (isTaskRoot) startActivityNoTransition(Intent(this, MainActivity::class.java))
         finish()
-        @Suppress("DEPRECATION")
-        overridePendingTransition(0, 0)
+    }
+
+    override fun finish() {
+        super.finish()
+        clearActivityTransition()
     }
 
     override fun onEnterAnimationComplete() {
@@ -342,7 +345,9 @@ class WatchActivity : AppCompatActivity() {
     override fun startActivity(intent: Intent, options: Bundle?) {
         internalNav = true
         if (Build.VERSION.SDK_INT >= 31) runCatching { setPictureInPictureParams(PictureInPictureParams.Builder().setAutoEnterEnabled(false).build()) }
-        super.startActivity(intent, options)
+        val opts = options ?: android.app.ActivityOptions.makeCustomAnimation(this, R.anim.no_anim, R.anim.no_anim).toBundle()
+        super.startActivity(intent, opts)
+        clearActivityTransition()
     }
 
     // ---- popup player (picture-in-picture) ----

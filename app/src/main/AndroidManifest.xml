@@ -20,6 +20,7 @@
     <activity android:name=".SearchActivity" android:exported="false" android:windowSoftInputMode="stateVisible|adjustResize"/>
     <activity android:name=".WatchActivity" android:exported="false" android:theme="@style/Theme.YTClassic.Watch"
         android:launchMode="singleTop" android:supportsPictureInPicture="true" android:resizeableActivity="true"
+        android:enableOnBackInvokedCallback="false"
         android:configChanges="orientation|screenSize|screenLayout|smallestScreenSize|keyboardHidden">
     </activity>
     <activity android:name=".VideoListActivity" android:exported="false"/>

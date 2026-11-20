@@ -8,6 +8,7 @@ import androidx.core.view.WindowInsetsCompat
 
 /** Draw behind the system bars (Android 15 forces this for targetSdk 35) on every Android version. */
 fun Activity.edgeToEdge(lightBars: Boolean) {
+    installNoActivityTransitions()
     WindowCompat.setDecorFitsSystemWindows(window, false)
     if (android.os.Build.VERSION.SDK_INT >= 29) {
         window.isStatusBarContrastEnforced = false

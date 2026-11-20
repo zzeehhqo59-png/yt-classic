@@ -76,7 +76,7 @@ class MainActivity : AppCompatActivity() {
 fun android.content.Context.openDownloaded(d: Downloads.Dl) {
     val f = d.file?.let { java.io.File(it) }
     if (f == null || !f.exists()) { Toast.makeText(this, "ไม่พบไฟล์ที่ดาวน์โหลดไว้ (อาจถูกลบไปแล้ว)", Toast.LENGTH_SHORT).show(); return }
-    startActivity(Intent(this, WatchActivity::class.java).putExtra(WatchActivity.EXTRA_ITEM, d.video()).putExtra(WatchActivity.EXTRA_FILE, f.path)
+    startActivityNoTransition(Intent(this, WatchActivity::class.java).putExtra(WatchActivity.EXTRA_ITEM, d.video()).putExtra(WatchActivity.EXTRA_FILE, f.path)
         .addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP))
 }
 
@@ -84,10 +84,7 @@ fun android.content.Context.openVideo(v: VideoItem, expandFrom: Float = -1f) {
     val i = Intent(this, WatchActivity::class.java).putExtra(WatchActivity.EXTRA_ITEM, v)
         .addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP)
     if (expandFrom > 0f) i.putExtra(WatchActivity.EXTRA_EXPAND_FROM, expandFrom)
-    startActivity(i)
-    // no slide: the watch page appears in place (and grows out of the mini bar when expanding)
-    @Suppress("DEPRECATION")
-    (this as? android.app.Activity)?.overridePendingTransition(0, 0)
+    startActivityNoTransition(i)
 }
 
 class HomeFragment : Fragment() {
