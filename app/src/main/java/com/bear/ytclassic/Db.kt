@@ -138,6 +138,10 @@ object Prefs {
     var background: Boolean
         get() = p.getBoolean("background", true)
         set(v) { p.edit().putBoolean("background", v).apply() }
+    /** เล่นอัตโนมัติ: play the up-next video when one ends. */
+    var autoplay: Boolean
+        get() = p.getBoolean("autoplay", true)
+        set(v) { p.edit().putBoolean("autoplay", v).apply() }
     private fun b(k: String, def: Boolean) = p.getBoolean(k, def)
     private fun setB(k: String, v: Boolean) = p.edit().putBoolean(k, v).apply()
     /** Don't add newly watched videos to the watch history. */

@@ -1,9 +1,9 @@
-<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android" xmlns:app="http://schemas.android.com/apk/res-auto"
-    android:id="@+id/root" android:layout_width="match_parent" android:layout_height="match_parent" android:orientation="vertical" android:background="#000000">
-  <com.bear.ytclassic.DragFrame android:id="@+id/playerBox" android:layout_width="match_parent" android:layout_height="wrap_content" android:background="#000000">
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android" xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:id="@+id/root" android:layout_width="match_parent" android:layout_height="match_parent" android:background="#000000" android:clipChildren="false">
+  <androidx.recyclerview.widget.RecyclerView android:id="@+id/list" android:background="@color/bg" android:layout_width="match_parent" android:layout_height="match_parent"/>
+  <com.bear.ytclassic.DragFrame android:id="@+id/playerBox" android:layout_width="match_parent" android:layout_height="wrap_content" android:background="#000000" android:clipChildren="false">
     <com.google.android.exoplayer2.ui.StyledPlayerView android:id="@+id/playerView" android:layout_width="match_parent" android:layout_height="match_parent"
-        app:show_shuffle_button="false" app:show_subtitle_button="true" app:show_timeout="3000" app:show_vr_button="false" app:show_next_button="false" app:show_previous_button="false"
-        app:use_artwork="false" app:show_buffering="always" app:surface_type="texture_view"/>
+        app:use_controller="false" app:use_artwork="false" app:show_buffering="always" app:surface_type="texture_view"/>
     <LinearLayout android:layout_width="match_parent" android:layout_height="match_parent" android:orientation="horizontal">
       <TextView android:id="@+id/seekLeft" android:layout_width="0dp" android:layout_weight="1" android:layout_height="match_parent" android:gravity="center"
           android:background="@drawable/bg_seek_left" android:textColor="#FFFFFF" android:textSize="14sp" android:textStyle="bold" android:alpha="0" android:importantForAccessibility="no"/>
@@ -11,8 +11,77 @@
       <TextView android:id="@+id/seekRight" android:layout_width="0dp" android:layout_weight="1" android:layout_height="match_parent" android:gravity="center"
           android:background="@drawable/bg_seek_right" android:textColor="#FFFFFF" android:textSize="14sp" android:textStyle="bold" android:alpha="0" android:importantForAccessibility="no"/>
     </LinearLayout>
-    <ImageButton android:id="@+id/btnPlayerQuality" android:layout_width="48dp" android:layout_height="48dp" android:layout_gravity="top|end"
-        android:background="?attr/selectableItemBackgroundBorderless" android:src="@drawable/ic_tune" app:tint="#FFFFFF" android:contentDescription="@string/quality" android:visibility="gone"/>
+
+    <!-- YouTube-style overlay controls -->
+    <FrameLayout android:id="@+id/controls" android:layout_width="match_parent" android:layout_height="match_parent" android:visibility="gone">
+      <View android:layout_width="match_parent" android:layout_height="match_parent" android:background="@drawable/bg_ctrl_scrim"/>
+      <LinearLayout android:id="@+id/topBar" android:layout_width="match_parent" android:layout_height="48dp" android:layout_gravity="top"
+          android:orientation="horizontal" android:gravity="center_vertical" android:paddingStart="4dp" android:paddingEnd="4dp">
+        <ImageButton android:id="@+id/btnBack" android:layout_width="44dp" android:layout_height="44dp" android:background="?attr/selectableItemBackgroundBorderless"
+            android:src="@drawable/ic_chevron_left" android:contentDescription="ออกจากโหมดเต็มหน้าจอ" android:visibility="gone"/>
+        <LinearLayout android:id="@+id/titleBox" android:layout_width="0dp" android:layout_weight="1" android:layout_height="wrap_content" android:orientation="vertical" android:visibility="gone">
+          <TextView android:id="@+id/landTitle" android:layout_width="match_parent" android:layout_height="wrap_content" android:textColor="#FFFFFF" android:textSize="15sp"
+              android:textStyle="bold" android:maxLines="1" android:ellipsize="end"/>
+          <TextView android:id="@+id/landChannel" android:layout_width="match_parent" android:layout_height="wrap_content" android:textColor="#CCFFFFFF" android:textSize="12sp"
+              android:maxLines="1" android:ellipsize="end"/>
+        </LinearLayout>
+        <View android:id="@+id/topSpacer" android:layout_width="0dp" android:layout_weight="1" android:layout_height="1dp"/>
+        <com.bear.ytclassic.AutoplaySwitch android:id="@+id/btnAutoplay" android:layout_width="48dp" android:layout_height="48dp" android:background="?attr/selectableItemBackgroundBorderless"/>
+        <ImageButton android:id="@+id/btnCC" android:layout_width="44dp" android:layout_height="44dp" android:background="?attr/selectableItemBackgroundBorderless"
+            android:src="@drawable/ic_cc" android:contentDescription="คำบรรยาย"/>
+        <ImageButton android:id="@+id/btnSettings" android:layout_width="44dp" android:layout_height="44dp" android:background="?attr/selectableItemBackgroundBorderless"
+            android:src="@drawable/ic_settings" app:tint="#FFFFFF" android:contentDescription="การตั้งค่า"/>
+      </LinearLayout>
+      <LinearLayout android:id="@+id/centerRow" android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_gravity="center"
+          android:orientation="horizontal" android:gravity="center_vertical">
+        <ImageButton android:id="@+id/btnPrev" android:layout_width="48dp" android:layout_height="48dp" android:background="@drawable/bg_circle_ctrl" android:padding="10dp"
+            android:scaleType="fitCenter" android:src="@drawable/ic_skip_prev" android:contentDescription="ก่อนหน้า"/>
+        <ImageButton android:id="@+id/btnPlay" android:layout_width="64dp" android:layout_height="64dp" android:layout_marginStart="36dp" android:layout_marginEnd="36dp"
+            android:background="@drawable/bg_circle_ctrl" android:padding="14dp" android:scaleType="fitCenter" android:src="@drawable/ic_pause" app:tint="#FFFFFF" android:contentDescription="เล่น/หยุดชั่วคราว"/>
+        <ImageButton android:id="@+id/btnNext" android:layout_width="48dp" android:layout_height="48dp" android:background="@drawable/bg_circle_ctrl" android:padding="10dp"
+            android:scaleType="fitCenter" android:src="@drawable/ic_skip_next" android:contentDescription="ถัดไป"/>
+      </LinearLayout>
+      <LinearLayout android:id="@+id/bottomBar" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_gravity="bottom"
+          android:layout_marginBottom="14dp" android:orientation="horizontal" android:gravity="center_vertical" android:paddingStart="12dp" android:paddingEnd="4dp">
+        <TextView android:id="@+id/timePill" android:layout_width="wrap_content" android:layout_height="wrap_content" android:background="@drawable/bg_time_pill"
+            android:paddingStart="10dp" android:paddingEnd="10dp" android:paddingTop="3dp" android:paddingBottom="3dp" android:textColor="#FFFFFF" android:textSize="12sp"/>
+        <View android:layout_width="0dp" android:layout_weight="1" android:layout_height="1dp"/>
+        <ImageButton android:id="@+id/btnFull" android:layout_width="44dp" android:layout_height="44dp" android:background="?attr/selectableItemBackgroundBorderless"
+            android:src="@drawable/ic_fullscreen" android:contentDescription="เต็มหน้าจอ"/>
+      </LinearLayout>
+      <LinearLayout android:id="@+id/landRow" android:layout_width="match_parent" android:layout_height="80dp" android:layout_gravity="bottom" android:visibility="gone"
+          android:orientation="horizontal" android:gravity="center_vertical" android:paddingStart="16dp" android:paddingEnd="16dp" android:paddingBottom="10dp">
+        <LinearLayout android:id="@+id/landComments" android:layout_width="0dp" android:layout_weight="1" android:layout_height="wrap_content" android:orientation="vertical"
+            android:background="@drawable/bg_land_card" android:padding="8dp">
+          <TextView android:id="@+id/landCommentsTitle" android:layout_width="match_parent" android:layout_height="wrap_content" android:textColor="#FFFFFF" android:textSize="12sp" android:textStyle="bold" android:text="ความคิดเห็น"/>
+          <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="horizontal" android:layout_marginTop="2dp">
+            <ImageView android:id="@+id/landCommentAvatar" android:layout_width="18dp" android:layout_height="18dp" android:background="@drawable/bg_avatar" android:importantForAccessibility="no"/>
+            <TextView android:id="@+id/landCommentText" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginStart="6dp" android:textColor="#E6FFFFFF"
+                android:textSize="11sp" android:maxLines="2" android:ellipsize="end"/>
+          </LinearLayout>
+        </LinearLayout>
+        <LinearLayout android:layout_width="0dp" android:layout_weight="1" android:layout_height="wrap_content" android:orientation="horizontal" android:gravity="center">
+          <ImageButton android:id="@+id/landLike" android:layout_width="44dp" android:layout_height="44dp" android:background="?attr/selectableItemBackgroundBorderless" android:src="@drawable/ic_thumb_up" app:tint="#FFFFFF" android:contentDescription="@string/like"/>
+          <ImageButton android:id="@+id/landDislike" android:layout_width="44dp" android:layout_height="44dp" android:background="?attr/selectableItemBackgroundBorderless" android:src="@drawable/ic_thumb_down" app:tint="#FFFFFF" android:contentDescription="@string/dislike"/>
+          <ImageButton android:id="@+id/landShare" android:layout_width="44dp" android:layout_height="44dp" android:background="?attr/selectableItemBackgroundBorderless" android:src="@drawable/ic_share" app:tint="#FFFFFF" android:contentDescription="@string/share"/>
+          <ImageButton android:id="@+id/landMore" android:layout_width="44dp" android:layout_height="44dp" android:background="?attr/selectableItemBackgroundBorderless" android:src="@drawable/ic_more_horiz" android:contentDescription="@string/more"/>
+        </LinearLayout>
+        <LinearLayout android:id="@+id/landNext" android:layout_width="0dp" android:layout_weight="1" android:layout_height="wrap_content" android:orientation="horizontal" android:gravity="end|center_vertical">
+          <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="วิดีโอเพิ่มเติม" android:textColor="#FFFFFF" android:textSize="12sp" android:layout_marginEnd="8dp"/>
+          <ImageView android:id="@+id/landNextThumb" android:layout_width="96dp" android:layout_height="54dp" android:scaleType="centerCrop" android:background="#40FFFFFF" android:importantForAccessibility="no"/>
+        </LinearLayout>
+      </LinearLayout>
+    </FrameLayout>
+
+    <LinearLayout android:id="@+id/previewBox" android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_gravity="bottom|start"
+        android:orientation="vertical" android:gravity="center_horizontal" android:visibility="gone">
+      <ImageView android:id="@+id/previewImg" android:layout_width="144dp" android:layout_height="81dp" android:background="@drawable/bg_preview_frame" android:padding="2dp"
+          android:scaleType="fitXY" android:importantForAccessibility="no"/>
+      <TextView android:id="@+id/previewPill" android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="6dp" android:background="@drawable/bg_time_pill"
+          android:paddingStart="10dp" android:paddingEnd="10dp" android:paddingTop="3dp" android:paddingBottom="3dp" android:textColor="#FFFFFF" android:textSize="12sp" android:maxLines="1" android:ellipsize="end" android:maxWidth="260dp"/>
+    </LinearLayout>
+    <com.bear.ytclassic.YtSeekBar android:id="@+id/seek" android:layout_width="match_parent" android:layout_height="32dp" android:layout_gravity="bottom" android:contentDescription="@string/exo_controls_seek_bar_description"/>
+
     <LinearLayout android:id="@+id/errorBox" android:layout_width="match_parent" android:layout_height="match_parent" android:orientation="vertical" android:gravity="center"
         android:background="#E6000000" android:padding="16dp" android:visibility="gone">
       <TextView android:id="@+id/playerError" android:layout_width="match_parent" android:layout_height="wrap_content" android:gravity="center"
@@ -24,5 +93,4 @@
     <ImageButton android:id="@+id/btnMinimize" android:layout_width="48dp" android:layout_height="48dp" android:layout_gravity="top|start"
         android:background="?attr/selectableItemBackgroundBorderless" android:src="@drawable/ic_expand_more" app:tint="#FFFFFF" android:contentDescription="ย่อ" android:visibility="gone"/>
   </com.bear.ytclassic.DragFrame>
-  <androidx.recyclerview.widget.RecyclerView android:id="@+id/list" android:background="@color/bg" android:layout_width="match_parent" android:layout_height="0dp" android:layout_weight="1"/>
-</LinearLayout>
+</FrameLayout>

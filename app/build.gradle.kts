@@ -18,8 +18,8 @@ android {
         applicationId = "com.bear.ytclassic"
         minSdk = 23
         targetSdk = 35
-        versionCode = 5000
-        versionName = "4.0.0"
+        versionCode = 5001
+        versionName = "4.0.1"
     }
 
     signingConfigs {

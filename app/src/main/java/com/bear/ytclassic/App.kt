@@ -16,6 +16,7 @@ class App : Application(), SingletonImageLoader.Factory {
         Prefs.init(this)
         Prefs.applyTheme()
         Db.init(this)
+        runCatching { Downloads.fixInterrupted() }
         Playback.init(this)
         registerActivityLifecycleCallbacks(object : ActivityLifecycleCallbacks {
             private var started = 0

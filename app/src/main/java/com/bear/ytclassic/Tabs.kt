@@ -227,11 +227,14 @@ class LibraryFragment : Fragment() {
         when (d.status) {
             Downloads.DONE -> add("เล่น") { ctx.openDownloaded(d) }
             Downloads.RUNNING, Downloads.QUEUED -> add("หยุดชั่วคราว") { DownloadService.send(ctx, DownloadService.ACTION_PAUSE, d.id) }
-            Downloads.PAUSED, Downloads.FAILED -> add("ดาวน์โหลดต่อ") { DownloadService.send(ctx, DownloadService.ACTION_START, d.id) }
+            Downloads.PAUSED -> add("ดาวน์โหลดต่อ") { DownloadService.send(ctx, DownloadService.ACTION_START, d.id) }
+            Downloads.FAILED -> add("ลองอีกครั้ง") { DownloadService.send(ctx, DownloadService.ACTION_START, d.id) }
         }
         if (d.status == Downloads.DONE) add("ลบไฟล์ที่ดาวน์โหลด") {
             AlertDialog.Builder(ctx).setMessage("ลบ \"${d.title}\" ออกจากเครื่องใช่ไหม")
                 .setPositiveButton("ลบ") { _, _ -> Downloads.delete(ctx, d.id) }.setNegativeButton("ยกเลิก", null).show()
+        } else if (d.status == Downloads.FAILED) add("ลบรายการนี้") {
+            Downloads.delete(ctx, d.id)
         } else if (d.status != Downloads.MERGING) add("ยกเลิกการดาวน์โหลด") {
             DownloadService.send(ctx, DownloadService.ACTION_CANCEL, d.id)
         }

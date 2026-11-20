@@ -41,27 +41,6 @@ fun Context.shareUrl(url: String) {
     startActivity(Intent.createChooser(Intent(Intent.ACTION_SEND).setType("text/plain").putExtra(Intent.EXTRA_TEXT, url), "แชร์"))
 }
 
-/** Checkbox dialog: tick = in that playlist. Includes "สร้างเพลย์ลิสต์ใหม่". */
-fun Context.saveToPlaylist(v: VideoItem) {
-    val pls = Playlists.all()
-    val names = pls.map { it.name }.toTypedArray()
-    val checked = pls.map { Playlists.contains(it.id, v.url) }.toBooleanArray()
-    AlertDialog.Builder(this)
-        .setTitle("บันทึกลงใน…")
-        .setMultiChoiceItems(names, checked) { _, i, on ->
-            if (on) Playlists.add(pls[i].id, v) else Playlists.remove(pls[i].id, v.url)
-            Toast.makeText(this, if (on) "บันทึกลงใน ${pls[i].name} แล้ว" else "นำออกจาก ${pls[i].name} แล้ว", Toast.LENGTH_SHORT).show()
-        }
-        .setNeutralButton("สร้างเพลย์ลิสต์ใหม่") { _, _ ->
-            askName("เพลย์ลิสต์ใหม่", "") { name ->
-                val id = Playlists.create(name); Playlists.add(id, v)
-                Toast.makeText(this, "บันทึกลงใน $name แล้ว", Toast.LENGTH_SHORT).show()
-            }
-        }
-        .setPositiveButton("เสร็จสิ้น", null)
-        .show()
-}
-
 fun Context.askName(title: String, initial: String, done: (String) -> Unit) {
     val edit = EditText(this).apply {
         setText(initial); setSelection(initial.length); hint = "ชื่อเพลย์ลิสต์"; inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_FLAG_CAP_SENTENCES

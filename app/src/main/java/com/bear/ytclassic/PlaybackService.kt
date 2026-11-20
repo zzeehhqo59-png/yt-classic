@@ -66,6 +66,7 @@ class PlaybackService : Service() {
             })
             .setNotificationListener(object : PlayerNotificationManager.NotificationListener {
                 override fun onNotificationPosted(id: Int, notification: Notification, ongoing: Boolean) {
+                    lastNotif = notification
                     if (ongoing && !foreground) {
                         ServiceCompat.startForeground(this@PlaybackService, id, notification,
                             if (Build.VERSION.SDK_INT >= 29) ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PLAYBACK else 0)
@@ -89,16 +90,19 @@ class PlaybackService : Service() {
             }
     }
 
+    private var lastNotif: Notification? = null
+
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
-        // startForegroundService() requires a startForeground() call quickly: post a placeholder until the player notification exists
-        if (!foreground && Build.VERSION.SDK_INT >= 26) {
+        // every startForegroundService() needs its own startForeground() call (also when already in the foreground,
+        // or when the player notification is about to drop out of it while switching videos)
+        if (Build.VERSION.SDK_INT >= 26) {
             val ch = android.app.NotificationChannel("playback", getString(R.string.notif_channel), android.app.NotificationManager.IMPORTANCE_LOW)
             getSystemService(android.app.NotificationManager::class.java).createNotificationChannel(ch)
-            val n = androidx.core.app.NotificationCompat.Builder(this, "playback").setSmallIcon(R.drawable.ic_notif)
-                .setContentTitle(Playback.state.value.item?.title ?: getString(R.string.app_name)).setSilent(true).build()
-            ServiceCompat.startForeground(this, 1001, n, if (Build.VERSION.SDK_INT >= 29) ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PLAYBACK else 0)
-            foreground = true
         }
+        val n = lastNotif ?: androidx.core.app.NotificationCompat.Builder(this, "playback").setSmallIcon(R.drawable.ic_notif)
+            .setContentTitle(Playback.state.value.item?.title ?: getString(R.string.app_name)).setSilent(true).build()
+        ServiceCompat.startForeground(this, 1001, n, if (Build.VERSION.SDK_INT >= 29) ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PLAYBACK else 0)
+        foreground = true
         return START_NOT_STICKY
     }
 

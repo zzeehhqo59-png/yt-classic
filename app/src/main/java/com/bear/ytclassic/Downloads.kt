@@ -94,8 +94,12 @@ object Downloads {
         Db.w.delete("downloads", "id=?", arrayOf("$id")); bump()
     }
 
-    /** Recover rows left RUNNING by a killed process. */
-    fun fixInterrupted() { Db.w.execSQL("UPDATE downloads SET status=$PAUSED WHERE status IN ($RUNNING,$MERGING)") }
+    /** Recover rows left by a killed process: downloading -> paused, merging -> failed (tap to retry, or delete). */
+    fun fixInterrupted() {
+        Db.w.execSQL("UPDATE downloads SET status=$PAUSED WHERE status=$RUNNING")
+        Db.w.execSQL("UPDATE downloads SET status=$FAILED, error='การรวมไฟล์ถูกขัดจังหวะ' WHERE status=$MERGING")
+        bump()
+    }
 
     fun mb(b: Long) = if (b <= 0) "0 MB" else String.format(java.util.Locale.US, "%.1f MB", b / 1048576.0)
 
@@ -144,7 +148,8 @@ object Downloads {
                 muxer.addTrack(ex.getTrackFormat(t))
             }
             muxer.start()
-            val buf = ByteBuffer.allocate(8 * 1024 * 1024)
+            // direct buffer: with a heap buffer the framework copies the whole array through JNI for every sample (very slow)
+            val buf = ByteBuffer.allocateDirect(4 * 1024 * 1024)
             val info = MediaCodec.BufferInfo()
             val ended = BooleanArray(exs.size)
             while (true) {
@@ -316,7 +321,14 @@ class DownloadService : Service() {
                     Downloads.update(d0.id) { put("status", Downloads.MERGING); put("done_bytes", total) }
                     progressNotif(d0, total, total, merging = true)
                     val ext = if (audioOnly) "m4a" else "mp4"
-                    val out = unique(Downloads.dir(ctx), safeName(d0.title) + (if (audioOnly) "" else " (${d0.height}p)"), ext)
+                    // same name on retry: overwrite this download's own partial file instead of making "(2)"
+                    val nameBase = safeName(d0.title) + (if (audioOnly) "" else " (${d0.height}p)")
+                    val target = File(Downloads.dir(ctx), "$nameBase.$ext")
+                    val taken = Downloads.all().any { it.id != d0.id && it.file == target.path }
+                    val out = if (taken) unique(Downloads.dir(ctx), nameBase, ext) else target
+                    Downloads.get(d0.id)?.file?.let { old -> if (old != out.path) File(old).delete() }
+                    out.delete()
+                    Downloads.update(d0.id) { put("file", out.path) }
                     val inputs = jobs.map { it.second }
                     val muxOk = runCatching { Downloads.mux(inputs, out) }.isSuccess
                     if (!muxOk) {
