@@ -18,6 +18,8 @@
       <View android:layout_width="match_parent" android:layout_height="1dp" android:background="@color/divider"/>
       <TextView android:id="@+id/rowClearHistory" android:layout_width="match_parent" android:layout_height="wrap_content" android:padding="16dp" android:background="?attr/selectableItemBackground"
           android:text="ล้างประวัติการดูทั้งหมด" android:textColor="@color/text1" android:textSize="15sp"/>
+      <TextView android:id="@+id/rowClearSearch" android:layout_width="match_parent" android:layout_height="wrap_content" android:padding="16dp" android:background="?attr/selectableItemBackground"
+          android:text="ล้างประวัติการค้นหา" android:textColor="@color/text1" android:textSize="15sp"/>
       <TextView android:id="@+id/version" android:layout_width="match_parent" android:layout_height="wrap_content" android:padding="16dp" android:textColor="@color/text3" android:textSize="12sp"/>
     </LinearLayout>
   </ScrollView>

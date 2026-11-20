@@ -6,6 +6,8 @@ import android.os.Handler
 import android.os.Looper
 import androidx.core.content.ContextCompat
 import com.google.android.exoplayer2.C
+import com.google.android.exoplayer2.DefaultLoadControl
+import com.google.android.exoplayer2.source.dash.manifest.DashManifestParser
 import com.google.android.exoplayer2.ExoPlayer
 import com.google.android.exoplayer2.MediaItem
 import com.google.android.exoplayer2.MediaMetadata
@@ -56,6 +58,8 @@ object Playback {
     val state: StateFlow<State> = _state
     /** True while the watch page is shown as a popup (PiP); the mini bar hides then so the popup keeps the video. */
     val pip = MutableStateFlow(false)
+    /** True while the full watch page exists; the mini bar stays hidden (and off the video surface) meanwhile. */
+    val watchActive = MutableStateFlow(false)
     var qualities: List<Quality> = emptyList(); private set
     var current = -1; private set
     var live = false; private set
@@ -70,14 +74,19 @@ object Playback {
             .setAudioAttributes(AudioAttributes.Builder().setUsage(C.USAGE_MEDIA).setContentType(C.AUDIO_CONTENT_TYPE_MOVIE).build(), true)
             .setHandleAudioBecomingNoisy(true)
             .setWakeMode(C.WAKE_MODE_NETWORK)
+            .setLoadControl(DefaultLoadControl.Builder().setBufferDurationsMs(30_000, 60_000, 2_500, 5_000).build())
             .build().also { p ->
                 p.addListener(object : Player.Listener {
                     override fun onPlayerError(error: PlaybackException) {
                         savePosition()
+                        // stream URLs expire / get throttled (typically after the app sat in the background): fetch fresh ones and continue
+                        val sourceError = error.errorCode in 2000..3999
+                        if (sourceError && retries < 2 && _state.value.item != null) { retries++; lastRetryAt = System.currentTimeMillis(); refetch(); return }
                         _state.value = _state.value.copy(loading = false, error = "เล่นวิดีโอไม่ได้ ลองเลือกคุณภาพอื่น\n(${error.errorCodeName})")
                     }
                     override fun onPlaybackStateChanged(s: Int) {
                         if (s == Player.STATE_READY && _state.value.loading) _state.value = _state.value.copy(loading = false)
+                        if (s == Player.STATE_READY && System.currentTimeMillis() - lastRetryAt > 60_000) retries = 0
                         if (s == Player.STATE_ENDED) _state.value.item?.let { val d = p.duration; if (d > 0) History.updatePosition(it.url, d, d) }
                     }
                     override fun onIsPlayingChanged(isPlaying: Boolean) {
@@ -94,6 +103,41 @@ object Playback {
 
     fun init(c: Context) { app = c.applicationContext }
 
+    private var retries = 0
+    private var lastRetryAt = 0L
+    private var resumeAt = 0L
+
+    /** Re-extract the video (fresh URLs) and continue at the same position. */
+    private fun refetch() {
+        val item = _state.value.item ?: return
+        resumeAt = if (live) 0 else player.currentPosition.coerceAtLeast(0)
+        val label = qualities.getOrNull(current)?.label
+        val attempt = retries
+        loadJob?.cancel()
+        _state.value = _state.value.copy(loading = true, error = null)
+        loadJob = scope.launch {
+            try {
+                val info = Repo.stream(item.url)
+                qualities = buildQualities(info)
+                if (qualities.isEmpty()) throw ContentNotAvailableException("no streams")
+                var idx = qualities.indexOfFirst { it.label == label }
+                // second attempt: leave adaptive (DASH) mode for a plain progressive stream
+                if (idx < 0 || (attempt >= 2 && qualities[idx].height == AUTO)) idx = defaultIndex(progressiveOnly = attempt >= 2)
+                _state.value = _state.value.copy(info = info)
+                play(idx, resumeAt)
+            } catch (e: CancellationException) { throw e
+            } catch (e: Throwable) {
+                _state.value = _state.value.copy(loading = false, error = Errors.video(e, item))
+            }
+        }
+    }
+
+    const val AUTO = Int.MAX_VALUE
+    private fun defaultIndex(progressiveOnly: Boolean = false): Int {
+        if (!progressiveOnly) qualities.indexOfFirst { it.height == AUTO }.takeIf { it >= 0 }?.let { return it }
+        return qualities.indexOfLast { it.height in 1..720 }.takeIf { it >= 0 } ?: 0
+    }
+
     private fun savePosition() {
         val it = _state.value.item ?: return
         if (live || qualities.isEmpty() || player.playbackState == Player.STATE_ENDED) return
@@ -106,6 +150,7 @@ object Playback {
         if (_state.value.item?.url == item.url && _state.value.error == null) return
         savePosition()
         loadJob?.cancel()
+        retries = 0
         player.stop(); player.clearMediaItems()
         qualities = emptyList(); current = -1; subtitles = emptyList(); live = false
         _state.value = State(item = item, loading = true)
@@ -133,7 +178,7 @@ object Playback {
                     app.stopService(Intent(app, PlaybackService::class.java))
                     return@launch
                 }
-                val def = qualities.indexOfLast { it.height in 1..720 }.takeIf { it >= 0 } ?: 0
+                val def = defaultIndex()
                 val saved = if (live) 0 else History.position(item.url)
                 val durMs = full.durationSec * 1000
                 val start = if (saved > 5000 && (durMs <= 0 || saved < durMs - 15_000)) saved else 0
@@ -190,6 +235,40 @@ object Playback {
         player.trackSelectionParameters = player.trackSelectionParameters.buildUpon().setTrackTypeDisabled(C.TRACK_TYPE_VIDEO, !visible).build()
     }
 
+    /**
+     * "อัตโนมัติ": one DASH manifest holding every H.264 video height + the best AAC audio,
+     * so ExoPlayer picks (and switches) the height by measured bandwidth.
+     */
+    private fun adaptive(info: StreamInfo, videoOnly: List<VideoStream>, audios: List<AudioStream>): Quality? {
+        val durS = info.duration.takeIf { it > 0 } ?: return null
+        fun indexed(s: org.schabi.newpipe.extractor.stream.Stream) = s.itagItem?.let { it.initEnd > 0 && it.indexEnd > it.indexStart && it.indexStart > 0 } == true
+        val vids = videoOnly.filter { it.format == MediaFormat.MPEG_4 && (it.codec ?: "").startsWith("avc") && indexed(it) && it.height <= 1080 }
+            .groupBy { it.height }.map { (_, l) -> l.maxBy { v -> v.itagItem!!.bitrate } }.sortedBy { it.height }
+        if (vids.size < 2) return null
+        val a = audios.filter { it.format == MediaFormat.M4A && indexed(it) }.maxByOrNull { it.itagItem!!.bitrate } ?: return null
+        fun esc(u: String) = u.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;").replace("\"", "&quot;")
+        fun rep(id: String, s: org.schabi.newpipe.extractor.stream.Stream, attrs: String): String {
+            val it = s.itagItem!!
+            return "<Representation id=\"$id\" bandwidth=\"${it.bitrate.coerceAtLeast(1)}\" codecs=\"${esc(it.codec ?: "")}\" $attrs>" +
+                "<BaseURL>${esc(s.content)}</BaseURL><SegmentBase indexRange=\"${it.indexStart}-${it.indexEnd}\">" +
+                "<Initialization range=\"${it.initStart}-${it.initEnd}\"/></SegmentBase></Representation>"
+        }
+        val mpd = buildString {
+            append("<?xml version=\"1.0\" encoding=\"UTF-8\"?><MPD xmlns=\"urn:mpeg:dash:schema:mpd:2011\" profiles=\"urn:mpeg:dash:profile:isoff-on-demand:2011\" ")
+            append("type=\"static\" minBufferTime=\"PT1.500S\" mediaPresentationDuration=\"PT${durS}S\"><Period>")
+            append("<AdaptationSet id=\"0\" contentType=\"video\" mimeType=\"video/mp4\" subsegmentAlignment=\"true\">")
+            vids.forEachIndexed { i, v -> append(rep("v$i", v, "width=\"${v.width}\" height=\"${v.height}\"" + if (v.fps > 0) " frameRate=\"${v.fps}\"" else "")) }
+            append("</AdaptationSet><AdaptationSet id=\"1\" contentType=\"audio\" mimeType=\"audio/mp4\" subsegmentAlignment=\"true\">")
+            append(rep("a0", a, "audioSamplingRate=\"44100\""))
+            append("</AdaptationSet></Period></MPD>")
+        }
+        val manifest = DashManifestParser().parse(android.net.Uri.parse(info.url), java.io.ByteArrayInputStream(mpd.toByteArray()))
+        return Quality("อัตโนมัติ", AUTO) {
+            DashMediaSource.Factory(dsFactory).createMediaSource(manifest,
+                MediaItem.Builder().setUri(info.url).setMimeType(MimeTypes.APPLICATION_MPD).build())
+        }
+    }
+
     private fun bestAudio(audios: List<AudioStream>, forWebm: Boolean): AudioStream? {
         val pref = audios.filter { if (forWebm) it.format == MediaFormat.WEBMA || it.format == MediaFormat.WEBMA_OPUS else it.format == MediaFormat.M4A }
         return (pref.ifEmpty { audios }).maxByOrNull { if (it.averageBitrate > 0) it.averageBitrate else it.bitrate }
@@ -227,6 +306,7 @@ object Playback {
             if (!byHeight.containsKey(h)) byHeight[h] = Quality(if (h > 0) "${h}p" else v.resolution, h) { prog.createMediaSource(MediaItem.fromUri(v.content)) }
         }
         out.addAll(byHeight.values.sortedBy { it.height })
+        if (audios.isNotEmpty()) runCatching { adaptive(info, videoOnly, audios) }.getOrNull()?.let { out.add(it) }
         if (out.isEmpty() && hls.isNotEmpty()) out.add(Quality("อัตโนมัติ", 0) { HlsMediaSource.Factory(dsFactory).createMediaSource(MediaItem.fromUri(hls)) })
         return out
     }

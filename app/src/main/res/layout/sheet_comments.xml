@@ -1,0 +1,13 @@
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android" android:layout_width="match_parent" android:layout_height="match_parent" android:orientation="vertical" android:background="@color/bg">
+  <LinearLayout android:layout_width="match_parent" android:layout_height="48dp" android:orientation="horizontal" android:gravity="center_vertical" android:paddingStart="16dp">
+    <TextView android:id="@+id/sheetTitle" android:layout_width="0dp" android:layout_weight="1" android:layout_height="wrap_content" android:text="ความคิดเห็น" android:textColor="@color/text1" android:textSize="17sp" android:textStyle="bold"/>
+    <ImageButton android:id="@+id/sheetClose" android:layout_width="48dp" android:layout_height="48dp" android:background="?attr/selectableItemBackgroundBorderless" android:src="@drawable/ic_close" android:contentDescription="ปิด"/>
+  </LinearLayout>
+  <View android:layout_width="match_parent" android:layout_height="1dp" android:background="@color/divider"/>
+  <FrameLayout android:layout_width="match_parent" android:layout_height="match_parent">
+    <androidx.recyclerview.widget.RecyclerView android:id="@+id/commentList" android:layout_width="match_parent" android:layout_height="match_parent"/>
+    <ProgressBar android:id="@+id/commentProgress" android:layout_width="40dp" android:layout_height="40dp" android:layout_gravity="center" android:indeterminateTint="#FF0000"/>
+    <TextView android:id="@+id/commentMessage" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_gravity="center" android:gravity="center" android:padding="24dp"
+        android:textColor="@color/text2" android:textSize="15sp" android:visibility="gone"/>
+  </FrameLayout>
+</LinearLayout>

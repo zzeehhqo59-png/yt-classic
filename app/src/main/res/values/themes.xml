@@ -18,6 +18,9 @@
   <style name="Theme.YTClassic.Watch" parent="Theme.YTClassic">
     <item name="android:statusBarColor">@android:color/transparent</item>
     <item name="android:windowLightStatusBar">false</item>
+    <!-- translucent so the screen underneath shows while the page is dragged down; made opaque again in code once shown -->
+    <item name="android:windowIsTranslucent">true</item>
+    <item name="android:windowBackground">@android:color/transparent</item>
   </style>
   <style name="NavText" parent="TextAppearance.MaterialComponents.Caption"><item name="android:textSize">11sp</item></style>
   <style name="WatchAction"><item name="android:layout_width">0dp</item><item name="android:layout_weight">1</item><item name="android:layout_height">wrap_content</item><item name="android:gravity">center</item><item name="android:drawablePadding">4dp</item><item name="android:textColor">@color/text2</item><item name="android:textSize">12sp</item><item name="android:drawableTint">@color/icon</item><item name="android:background">?attr/selectableItemBackgroundBorderless</item><item name="android:paddingTop">4dp</item><item name="android:paddingBottom">4dp</item></style>

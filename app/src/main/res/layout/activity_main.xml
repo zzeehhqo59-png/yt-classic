@@ -2,17 +2,18 @@
     android:id="@+id/root" android:layout_width="match_parent" android:layout_height="match_parent" android:orientation="vertical" android:background="@color/bg">
   <LinearLayout android:id="@+id/topBar" android:layout_width="match_parent" android:layout_height="48dp" android:orientation="horizontal"
       android:gravity="center_vertical" android:background="@color/bg" android:elevation="4dp" android:paddingStart="16dp" android:paddingEnd="4dp">
-    <ImageView android:layout_width="28dp" android:layout_height="20dp" android:src="@drawable/ic_yt_logo" android:importantForAccessibility="no"/>
-    <TextView android:id="@+id/logoText" android:layout_width="0dp" android:layout_weight="1" android:layout_height="wrap_content" android:layout_marginStart="4dp"
-        android:text="YouTube" android:textColor="@color/text1" android:textSize="20sp" android:textStyle="bold" android:letterSpacing="-0.04" android:fontFamily="sans-serif-condensed"/>
+    <ImageView android:layout_width="28dp" android:layout_height="28dp" android:src="@drawable/ic_tv_logo" android:importantForAccessibility="no"/>
+    <TextView android:id="@+id/logoText" android:layout_width="0dp" android:layout_weight="1" android:layout_height="wrap_content" android:layout_marginStart="10dp"
+        android:text="YT Classic" android:textColor="@color/text1" android:textSize="20sp" android:textStyle="bold" android:fontFamily="sans-serif-medium"/>
     <ImageButton android:id="@+id/btnSearch" android:layout_width="48dp" android:layout_height="48dp" android:background="?attr/selectableItemBackgroundBorderless"
         android:src="@drawable/ic_search" android:contentDescription="@string/search"/>
     <ImageButton android:id="@+id/btnAccount" android:layout_width="48dp" android:layout_height="48dp" android:background="?attr/selectableItemBackgroundBorderless"
         android:src="@drawable/ic_account" android:contentDescription="@string/account"/>
   </LinearLayout>
   <FrameLayout android:id="@+id/container" android:layout_width="match_parent" android:layout_height="0dp" android:layout_weight="1"/>
-  <LinearLayout android:id="@+id/miniBar" android:layout_width="match_parent" android:layout_height="56dp" android:orientation="horizontal" android:gravity="center_vertical"
-      android:background="@color/surface" android:elevation="6dp" android:visibility="gone" android:clickable="true" android:focusable="true">
+  <com.bear.ytclassic.DragFrame android:id="@+id/miniBar" android:layout_width="match_parent" android:layout_height="56dp"
+      android:background="@color/surface" android:elevation="6dp" android:visibility="gone" android:focusable="true">
+  <LinearLayout android:layout_width="match_parent" android:layout_height="match_parent" android:orientation="horizontal" android:gravity="center_vertical">
     <FrameLayout android:layout_width="100dp" android:layout_height="match_parent" android:background="#000000">
       <com.google.android.exoplayer2.ui.StyledPlayerView android:id="@+id/miniPlayer" android:layout_width="match_parent" android:layout_height="match_parent"
           app:use_controller="false" app:resize_mode="zoom" app:surface_type="texture_view" app:shutter_background_color="#000000"/>
@@ -25,6 +26,7 @@
     <ImageButton android:id="@+id/miniPlay" android:layout_width="48dp" android:layout_height="48dp" android:background="?attr/selectableItemBackgroundBorderless" android:src="@drawable/ic_pause" android:contentDescription="เล่นหรือหยุดชั่วคราว"/>
     <ImageButton android:id="@+id/miniClose" android:layout_width="48dp" android:layout_height="48dp" android:background="?attr/selectableItemBackgroundBorderless" android:src="@drawable/ic_close" android:contentDescription="ปิด"/>
   </LinearLayout>
+  </com.bear.ytclassic.DragFrame>
   <ProgressBar android:id="@+id/miniProgress" style="?android:attr/progressBarStyleHorizontal" android:layout_width="match_parent" android:layout_height="2dp"
       android:progressTint="#FF0000" android:progressBackgroundTint="@color/divider" android:max="1000" android:visibility="gone"/>
   <View android:layout_width="match_parent" android:layout_height="1dp" android:background="@color/divider"/>

@@ -39,12 +39,25 @@ import org.schabi.newpipe.extractor.stream.StreamInfo
 import org.schabi.newpipe.extractor.stream.StreamType
 
 class WatchActivity : AppCompatActivity() {
-    companion object { const val EXTRA_ITEM = "item" }
+    companion object {
+        const val EXTRA_ITEM = "item"
+        /** Start the page collapsed at this drag progress (1 = mini player) and animate it open. */
+        const val EXTRA_EXPAND_FROM = "expand_from"
+    }
 
     private lateinit var item: VideoItem
     private val player get() = Playback.player
     private lateinit var playerView: StyledPlayerView
-    private lateinit var playerBox: FrameLayout
+    private lateinit var playerBox: DragFrame
+    private lateinit var errorBox: View
+    private lateinit var root: View
+    private lateinit var rootBg: android.graphics.drawable.Drawable
+    private var progress = 0f
+    private var anim: android.animation.ValueAnimator? = null
+    private var expanding = false
+    private var leaving = false
+    private var comments: org.schabi.newpipe.extractor.comments.CommentsInfo? = null
+    private var commentsFor: String? = null
     private lateinit var playerError: TextView
     private lateinit var playerLoading: View
     private lateinit var btnMinimize: View
@@ -78,38 +91,52 @@ class WatchActivity : AppCompatActivity() {
             layoutInDisplayCutoutMode = WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_SHORT_EDGES
         }
         setContentView(R.layout.activity_watch)
-        findViewById<View>(R.id.root).padForSystemBars { !isLandscape() && !inPip }
+        Playback.watchActive.value = true
+        root = findViewById(R.id.root)
+        rootBg = root.background.mutate()
+        root.padForSystemBars { !isLandscape() && !inPip }
         seekLeft = findViewById(R.id.seekLeft)
         seekRight = findViewById(R.id.seekRight)
         playerView = findViewById(R.id.playerView)
         playerBox = findViewById(R.id.playerBox)
         playerError = findViewById(R.id.playerError)
+        errorBox = findViewById(R.id.errorBox)
+        findViewById<View>(R.id.btnPlayerRetry).setOnClickListener { Playback.retry() }
         playerLoading = findViewById(R.id.playerLoading)
         btnMinimize = findViewById(R.id.btnMinimize)
         list = findViewById(R.id.list)
         list.layoutManager = LinearLayoutManager(this)
         list.adapter = ConcatAdapter(header, related)
-        playerError.setOnClickListener { Playback.retry() }
+        setupDrag()
 
         val qBtn = findViewById<View>(R.id.btnPlayerQuality)
         qBtn.setOnClickListener { pickQuality() }
         btnMinimize.setOnClickListener { minimize() }
         playerView.setControllerVisibilityListener(StyledPlayerView.ControllerVisibilityListener { vis ->
             qBtn.visibility = if (vis == View.VISIBLE && qualities.size > 1 && !inPip) View.VISIBLE else View.GONE
-            btnMinimize.visibility = if (vis == View.VISIBLE && !isLandscape() && !inPip) View.VISIBLE else View.GONE
+            controllerShown = vis == View.VISIBLE
+            updateMinimizeButton()
         })
         setupGestures()
         playerView.setFullscreenButtonClickListener { full ->
-            requestedOrientation = if (full) ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE
-            else ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
+            runCatching {
+                requestedOrientation = if (full) ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE
+                else ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
+            }
         }
         onBackPressedDispatcher.addCallback(this, object : OnBackPressedCallback(true) {
             override fun handleOnBackPressed() {
-                if (isLandscape()) requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_PORTRAIT else minimize()
+                if (isLandscape()) runCatching { requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_PORTRAIT } else minimize()
             }
         })
         applyLayout(resources.configuration)
         if (!handleIntent(intent)) { finish(); return }
+        val from = intent.getFloatExtra(EXTRA_EXPAND_FROM, -1f)
+        if (from > 0f && savedInstanceState == null && !isLandscape()) {
+            expanding = true
+            playerBox.alpha = 0f
+            root.post { playerBox.alpha = 1f; setProgress(from); animateTo(0f) { expanding = false; setTranslucentCompat(false) } }
+        }
         lifecycleScope.launch {
             repeatOnLifecycle(Lifecycle.State.STARTED) {
                 Playback.state.collect { render(it) }
@@ -151,17 +178,125 @@ class WatchActivity : AppCompatActivity() {
             } else header.bindItem(it)
         }
         playerLoading.visibility = if (st.loading) View.VISIBLE else View.GONE
-        playerError.visibility = if (st.error != null) View.VISIBLE else View.GONE
+        errorBox.visibility = if (st.error != null) View.VISIBLE else View.GONE
         playerError.text = st.error
+        stateBlocking = st.loading || st.error != null
+        updateMinimizeButton()
         updatePipParams()
+        st.info?.let { loadComments(it.url) }
     }
 
-    /** Drops back to the app with the video still playing in the mini player. */
+    private fun loadComments(url: String) {
+        if (commentsFor == url) return
+        commentsFor = url; comments = null
+        header.setComments(null, null, null)
+        lifecycleScope.launch {
+            val ci = runCatching { kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+                org.schabi.newpipe.extractor.comments.CommentsInfo.getInfo(org.schabi.newpipe.extractor.ServiceList.YouTube, url)
+            } }.getOrNull()
+            if (commentsFor != url) return@launch
+            comments = ci
+            when {
+                ci == null -> header.setComments("ความคิดเห็น", "โหลดความคิดเห็นไม่ได้ แตะเพื่อลองอีกครั้ง", null)
+                ci.isLiveChat -> header.setComments(null, null, null)
+                ci.isCommentsDisabled -> header.setComments("ความคิดเห็น", "ปิดการแสดงความคิดเห็นอยู่", null)
+                else -> {
+                    val first = ci.relatedItems.firstOrNull()
+                    val n = if (ci.commentsCount >= 0) " · " + Fmt.shortNum(ci.commentsCount.toLong()) else ""
+                    header.setComments("ความคิดเห็น$n", first?.let { commentPlain(it) } ?: "ยังไม่มีความคิดเห็น", first?.uploaderAvatars?.pick(48))
+                }
+            }
+        }
+    }
+
+    private fun openComments() {
+        val ci = comments
+        if (ci == null) { commentsFor = null; boundInfo?.let { loadComments(it.url) }; return }
+        showCommentsSheet(this, ci, playerBox.bottom + root.paddingTop)
+    }
+
+    private var controllerShown = false
+    private var stateBlocking = false
+    /** The ˅ button shows with the controls, and always while loading / showing an error (so the page can still be minimized). */
+    private fun updateMinimizeButton() {
+        btnMinimize.visibility = if ((controllerShown || stateBlocking) && !isLandscape() && !inPip) View.VISIBLE else View.GONE
+    }
+
+    // ---- drag to minimize ----
+    private fun dp(v: Float) = v * resources.displayMetrics.density
+    /** Distance the player travels to reach the mini bar (above the bottom nav of the home screen). */
+    private fun range(): Float {
+        val target = root.height - root.paddingBottom - dp(56f + 1f + 2f + 56f)
+        return (target - playerBox.top).coerceAtLeast(dp(100f))
+    }
+
+    private fun setProgress(p: Float) {
+        progress = p.coerceIn(0f, 1f)
+        val w = playerBox.width.toFloat().coerceAtLeast(1f)
+        val sc = 1f - progress * (1f - dp(100f) / w)
+        playerBox.pivotX = 0f; playerBox.pivotY = 0f
+        playerBox.scaleX = sc; playerBox.scaleY = sc
+        playerBox.translationY = progress * range()
+        list.alpha = 1f - progress
+        list.translationY = progress * dp(160f)
+        rootBg.alpha = ((1f - progress) * 255).toInt()
+    }
+
+    private fun animateTo(target: Float, end: () -> Unit) {
+        anim?.cancel()
+        anim = android.animation.ValueAnimator.ofFloat(progress, target).apply {
+            duration = (220 + 160 * kotlin.math.abs(target - progress)).toLong()
+            interpolator = android.view.animation.DecelerateInterpolator(1.6f)
+            addUpdateListener { setProgress(it.animatedValue as Float) }
+            addListener(object : android.animation.AnimatorListenerAdapter() {
+                var cancelled = false
+                override fun onAnimationCancel(a: android.animation.Animator) { cancelled = true }
+                override fun onAnimationEnd(a: android.animation.Animator) { if (!cancelled) end() }
+            })
+            start()
+        }
+    }
+
+    private fun canDrag() = !isLandscape() && !inPip && !leaving
+
+    private fun setupDrag() {
+        playerBox.canDrag = { canDrag() }
+        playerBox.listener = object : DragFrame.Listener {
+            override fun onDragStart() { anim?.cancel(); beginCollapse() }
+            override fun onDrag(dy: Float) = setProgress(dy / range())
+            override fun onDragEnd(velocityY: Float) {
+                if (progress > 0.5f || velocityY > dp(600f)) animateTo(1f) { finishToMini() }
+                else animateTo(0f) { setTranslucentCompat(false) }
+            }
+        }
+    }
+
+    private fun beginCollapse() {
+        playerView.hideController()
+        setTranslucentCompat(true)
+    }
+
+    /** ˅ button / back: animate down into the mini player. */
     private fun minimize() {
+        if (leaving) return
+        if (!canDrag() || root.height == 0) { finishToMini(); return }
+        beginCollapse()
+        animateTo(1f) { finishToMini() }
+    }
+
+    private fun finishToMini() {
+        if (leaving) return
+        leaving = true
+        Playback.watchActive.value = false
         if (isTaskRoot) startActivity(Intent(this, MainActivity::class.java))
         finish()
         @Suppress("DEPRECATION")
-        overridePendingTransition(0, R.anim.slide_down)
+        overridePendingTransition(0, 0)
+    }
+
+    override fun onEnterAnimationComplete() {
+        super.onEnterAnimationComplete()
+        if (!expanding && progress == 0f) setTranslucentCompat(false)
     }
 
     override fun onStart() {
@@ -175,7 +310,11 @@ class WatchActivity : AppCompatActivity() {
         }
     }
 
-    override fun onDestroy() { super.onDestroy(); if (inPip) Playback.pip.value = false }
+    override fun onDestroy() {
+        super.onDestroy()
+        if (inPip) Playback.pip.value = false
+        if (isFinishing) Playback.watchActive.value = false
+    }
 
     override fun onStop() {
         super.onStop()
@@ -270,7 +409,7 @@ class WatchActivity : AppCompatActivity() {
             }.show()
     }
 
-    /** Double-tap left/right = seek 10 s, single tap = controls, swipe down = minimize. */
+    /** Double-tap left/right = seek 10 s, single tap = controls (swipe down is handled by [DragFrame]). */
     private fun setupGestures() {
         val detector = GestureDetector(this, object : GestureDetector.SimpleOnGestureListener() {
             override fun onDown(e: MotionEvent) = true
@@ -280,13 +419,6 @@ class WatchActivity : AppCompatActivity() {
                 if (System.currentTimeMillis() - lastSeekAt < 800 && side == seekSide) { seekBy(e); return true }
                 if (playerView.isControllerFullyVisible) playerView.hideController() else playerView.showController()
                 return true
-            }
-            override fun onFling(e1: MotionEvent?, e2: MotionEvent, vx: Float, vy: Float): Boolean {
-                val dy = e2.y - (e1?.y ?: e2.y)
-                if (!isLandscape() && !inPip && vy > 1200 && dy > 80 * resources.displayMetrics.density / 2 && kotlin.math.abs(vy) > kotlin.math.abs(vx)) {
-                    minimize(); return true
-                }
-                return false
             }
         })
         playerView.setOnTouchListener { _, ev -> detector.onTouchEvent(ev); true }
@@ -313,6 +445,9 @@ class WatchActivity : AppCompatActivity() {
         private var title = ""; private var views = ""; private var channel = ""; private var subs = ""
         private var avatar: String? = null; private var channelUrl: String? = null; private var subCount = -1L; private var likes = ""; private var desc: CharSequence = ""
         private var expanded = false
+
+        private var cTitle: String? = null; private var cPreview: String? = null; private var cAvatar: String? = null
+        fun setComments(title: String?, preview: String?, avatar: String?) { cTitle = title; cPreview = preview; cAvatar = avatar; notifyItemChanged(0) }
 
         fun reset() { expanded = false; likes = ""; desc = ""; subs = ""; subCount = -1 }
 
@@ -367,6 +502,13 @@ class WatchActivity : AppCompatActivity() {
             v.findViewById<View>(R.id.btnQuality).setOnClickListener { pickQuality() }
             v.findViewById<View>(R.id.btnShare).setOnClickListener { shareUrl(item.url) }
             v.findViewById<View>(R.id.btnSave).setOnClickListener { saveToPlaylist(item) }
+            val cRow = v.findViewById<View>(R.id.commentsRow)
+            cRow.visibility = if (cTitle == null) View.GONE else View.VISIBLE
+            v.findViewById<View>(R.id.commentsDivider).visibility = cRow.visibility
+            v.findViewById<TextView>(R.id.commentsTitle).text = cTitle
+            v.findViewById<TextView>(R.id.previewText).text = cPreview
+            v.findViewById<ImageView>(R.id.previewAvatar).apply { visibility = if (cAvatar == null) View.GONE else View.VISIBLE; loadAvatar(cAvatar) }
+            cRow.setOnClickListener { openComments() }
             val soon = View.OnClickListener { Toast.makeText(this@WatchActivity, R.string.coming_soon, Toast.LENGTH_SHORT).show() }
             v.findViewById<TextView>(R.id.btnSubscribe).bindSubscribe({
                 channelUrl?.let { u -> Channel(u, channel, avatar, subCount) }

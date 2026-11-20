@@ -48,7 +48,7 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    private lateinit var miniBar: View
+    private lateinit var miniBar: DragFrame
     private lateinit var miniPlayer: StyledPlayerView
     private lateinit var miniProgress: ProgressBar
     private lateinit var miniPlay: ImageButton
@@ -70,7 +70,8 @@ class MainActivity : AppCompatActivity() {
         miniPlayer = findViewById(R.id.miniPlayer)
         miniProgress = findViewById(R.id.miniProgress)
         miniPlay = findViewById(R.id.miniPlay)
-        miniBar.setOnClickListener { Playback.state.value.item?.let { openVideo(it) } }
+        miniBar.setOnClickListener { Playback.state.value.item?.let { openVideo(it, expandFrom = 1f) } }
+        setupMiniDrag()
         miniPlay.setOnClickListener {
             val p = Playback.player
             if (p.playbackState == Player.STATE_ENDED) p.seekTo(0)
@@ -79,10 +80,12 @@ class MainActivity : AppCompatActivity() {
         findViewById<View>(R.id.miniClose).setOnClickListener { Playback.close() }
         lifecycleScope.launch {
             repeatOnLifecycle(Lifecycle.State.STARTED) {
-                kotlinx.coroutines.flow.combine(Playback.state, Playback.pip) { a, b -> a to b }.collect { (st, pip) ->
+                kotlinx.coroutines.flow.combine(Playback.state, Playback.pip, Playback.watchActive) { a, b, c -> Triple(a, b, c) }.collect { (st, pip, watch) ->
                     val it = st.item
-                    val vis = if (it == null || pip) View.GONE else View.VISIBLE
-                    if (pip) miniPlayer.player = null else if (miniPlayer.player == null) miniPlayer.player = Playback.player
+                    val hidden = pip || watch
+                    val vis = if (it == null || hidden) View.GONE else View.VISIBLE
+                    if (hidden) miniPlayer.player = null else if (miniPlayer.player == null) miniPlayer.player = Playback.player
+                    if (!hidden) { miniBar.translationY = 0f; miniBar.alpha = 1f }
                     miniBar.visibility = vis; miniProgress.visibility = vis
                     if (it != null) {
                         findViewById<TextView>(R.id.miniTitle).text = it.title
@@ -97,10 +100,47 @@ class MainActivity : AppCompatActivity() {
 
     override fun onStart() {
         super.onStart()
-        if (!Playback.pip.value) miniPlayer.player = Playback.player
+        if (miniAllowed()) miniPlayer.player = Playback.player
         Playback.player.addListener(miniListener)
         updatePlayIcon()
         miniProgress.post(ticker)
+    }
+
+    private fun miniAllowed() = !Playback.pip.value && !Playback.watchActive.value
+
+    override fun onResume() {
+        super.onResume()
+        // take the video surface back from the watch page that just closed
+        if (miniAllowed() && Playback.state.value.item != null) { miniPlayer.player = null; miniPlayer.player = Playback.player }
+    }
+
+    /** Drag the mini player up to open the full watch page (snaps open past ~30% or on an upward fling). */
+    private fun setupMiniDrag() {
+        val d = resources.displayMetrics.density
+        miniBar.direction = -1
+        fun range() = miniBar.top.toFloat().coerceAtLeast(200 * d)
+        var anim: android.animation.ValueAnimator? = null
+        miniBar.listener = object : DragFrame.Listener {
+            override fun onDragStart() { anim?.cancel() }
+            override fun onDrag(dy: Float) {
+                val t = dy.coerceIn(-range(), 0f)
+                miniBar.translationY = t
+                miniBar.alpha = 1f - 0.4f * (-t / range())
+            }
+            override fun onDragEnd(velocityY: Float) {
+                val f = -miniBar.translationY / range()
+                val item = Playback.state.value.item
+                if (item != null && (f > 0.3f || velocityY < -600 * d)) {
+                    openVideo(item, expandFrom = (1f - f).coerceIn(0.05f, 1f))
+                } else {
+                    anim = android.animation.ValueAnimator.ofFloat(miniBar.translationY, 0f).apply {
+                        duration = 200
+                        addUpdateListener { miniBar.translationY = it.animatedValue as Float; miniBar.alpha = 1f - 0.4f * (-miniBar.translationY / range()) }
+                        start()
+                    }
+                }
+            }
+        }
     }
 
     override fun onStop() {
@@ -125,9 +165,13 @@ class MainActivity : AppCompatActivity() {
     }
 }
 
-fun android.content.Context.openVideo(v: VideoItem) {
-    startActivity(Intent(this, WatchActivity::class.java).putExtra(WatchActivity.EXTRA_ITEM, v)
-        .addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP))
+fun android.content.Context.openVideo(v: VideoItem, expandFrom: Float = -1f) {
+    val i = Intent(this, WatchActivity::class.java).putExtra(WatchActivity.EXTRA_ITEM, v)
+        .addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP)
+    if (expandFrom > 0f) i.putExtra(WatchActivity.EXTRA_EXPAND_FROM, expandFrom)
+    startActivity(i)
+    @Suppress("DEPRECATION")
+    if (expandFrom > 0f) (this as? android.app.Activity)?.overridePendingTransition(0, 0)
 }
 
 class HomeFragment : Fragment() {

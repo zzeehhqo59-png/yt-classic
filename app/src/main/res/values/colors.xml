@@ -9,4 +9,5 @@
   <color name="icon">#606060</color>
   <color name="link">#065FD4</color>
   <color name="chip_bg">#F2F2F2</color>
+  <color name="ic_launcher_bg">#1E2A38</color>
 </resources>

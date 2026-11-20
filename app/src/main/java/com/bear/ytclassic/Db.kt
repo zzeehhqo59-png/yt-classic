@@ -137,3 +137,16 @@ object Prefs {
     })
     val themeNames = arrayOf("ตามระบบ", "สว่าง", "มืด")
 }
+
+/** Recent search queries, newest first, no duplicates, at most 50 (stored on the phone only). */
+object SearchHistory {
+    private const val KEY = "search_history"
+    private const val MAX = 50
+    fun all(): List<String> = runCatching {
+        val a = org.json.JSONArray(Prefs.p.getString(KEY, "[]")); List(a.length()) { a.getString(it) }
+    }.getOrDefault(emptyList())
+    private fun save(l: List<String>) { Prefs.p.edit().putString(KEY, org.json.JSONArray(l.take(MAX)).toString()).apply() }
+    fun add(q: String) { val t = q.trim(); if (t.isEmpty()) return; save(listOf(t) + all().filterNot { it.equals(t, ignoreCase = true) }) }
+    fun remove(q: String) = save(all().filterNot { it == q })
+    fun clear() = save(emptyList())
+}

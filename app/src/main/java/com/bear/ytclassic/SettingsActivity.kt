@@ -27,6 +27,12 @@ class SettingsActivity : AppCompatActivity() {
             if (android.os.Build.VERSION.SDK_INT < 26) { isEnabled = false; text = "จอลอย (ภาพซ้อนภาพ)\nต้องใช้ Android 8.0 ขึ้นไป" }
         }
         findViewById<View>(R.id.rowClearHistory).setOnClickListener { confirmClearHistory(this) {} }
+        findViewById<View>(R.id.rowClearSearch).setOnClickListener {
+            AlertDialog.Builder(this).setTitle("ล้างประวัติการค้นหาใช่ไหม")
+                .setMessage("คำที่เคยค้นหาทั้งหมดจะถูกลบออกจากเครื่องนี้")
+                .setPositiveButton("ล้าง") { _, _ -> SearchHistory.clear(); android.widget.Toast.makeText(this, "ล้างประวัติการค้นหาแล้ว", android.widget.Toast.LENGTH_SHORT).show() }
+                .setNegativeButton("ยกเลิก", null).show()
+        }
         findViewById<TextView>(R.id.version).text = "YT Classic เวอร์ชัน " + runCatching { packageManager.getPackageInfo(packageName, 0).versionName }.getOrDefault("")
     }
 }

@@ -26,7 +26,7 @@ class SearchActivity : AppCompatActivity() {
     private lateinit var results: RecyclerView
     private lateinit var progress: View
     private lateinit var message: TextView
-    private val sugAdapter = SuggestionAdapter({ submit(it) }, { fill(it) })
+    private val sugAdapter = SuggestionAdapter({ submit(it) }, { fill(it) }, { askRemove(it) })
     private val resAdapter = VideoAdapter(false) { openItem(it) }
     private var filter = "all"
     private var lastQuery = ""
@@ -83,7 +83,9 @@ class SearchActivity : AppCompatActivity() {
             chips.addView(chip)
         }
         if (filters.size < 2) chips.visibility = View.GONE
+        query.setOnFocusChangeListener { _, has -> if (has) { showSuggestions(); loadSuggestions(query.text.toString()) } }
         query.requestFocus()
+        loadSuggestions("")
         intent.getStringExtra("q")?.let { submit(it) }
     }
 
@@ -102,20 +104,40 @@ class SearchActivity : AppCompatActivity() {
         query.setText(text); query.setSelection(text.length)
     }
 
+    /** Recent searches matching what is typed (all of them when the box is empty), then YouTube's suggestions. */
+    private fun historyFor(q: String): List<String> {
+        val all = SearchHistory.all()
+        return if (q.isBlank()) all else all.filter { it.contains(q.trim(), ignoreCase = true) }.take(4)
+    }
+
     private fun loadSuggestions(q: String) {
         sugJob?.cancel()
-        if (q.isBlank()) { sugAdapter.set(emptyList()); return }
+        val hist = historyFor(q)
+        sugAdapter.set(hist, hist.size)
+        if (q.isBlank()) return
         sugJob = lifecycleScope.launch {
             delay(200)
-            try { sugAdapter.set(Repo.suggestions(q)) }
+            try {
+                val s = Repo.suggestions(q).filterNot { x -> hist.any { it.equals(x, ignoreCase = true) } }
+                sugAdapter.set(hist + s, hist.size)
+            }
             catch (e: CancellationException) { throw e }
             catch (_: Throwable) { }
         }
     }
 
+    private fun askRemove(q: String) {
+        androidx.appcompat.app.AlertDialog.Builder(this)
+            .setTitle(q)
+            .setMessage("นำออกจากประวัติการค้นหาใช่ไหม")
+            .setPositiveButton("นำออก") { _, _ -> SearchHistory.remove(q); loadSuggestions(query.text.toString()) }
+            .setNegativeButton("ยกเลิก", null).show()
+    }
+
     private fun submit(q: String) {
         val text = q.trim()
         if (text.isEmpty()) return
+        SearchHistory.add(text)
         ignoreText = true; query.setText(text); query.setSelection(text.length); ignoreText = false
         sugJob?.cancel()
         (getSystemService(INPUT_METHOD_SERVICE) as InputMethodManager).hideSoftInputFromWindow(query.windowToken, 0)
@@ -158,20 +180,26 @@ class SearchActivity : AppCompatActivity() {
 class SuggestionAdapter(
     private val onPick: (String) -> Unit,
     private val onFill: (String) -> Unit,
+    private val onRemove: (String) -> Unit,
 ) : RecyclerView.Adapter<SuggestionAdapter.VH>() {
     private val items = ArrayList<String>()
-    fun set(list: List<String>) { items.clear(); items.addAll(list); notifyDataSetChanged() }
+    private var historyCount = 0
+    fun set(list: List<String>, history: Int = 0) { items.clear(); items.addAll(list); historyCount = history; notifyDataSetChanged() }
     override fun getItemCount() = items.size
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int) =
         VH(LayoutInflater.from(parent.context).inflate(R.layout.item_suggestion, parent, false))
     override fun onBindViewHolder(h: VH, position: Int) {
         val s = items[position]
         h.text.text = s
+        val hist = position < historyCount
+        h.icon.setImageResource(if (hist) R.drawable.ic_history else R.drawable.ic_search)
         h.itemView.setOnClickListener { onPick(s) }
+        if (hist) h.itemView.setOnLongClickListener { onRemove(s); true } else h.itemView.setOnLongClickListener(null)
         h.fill.setOnClickListener { onFill(s) }
     }
     class VH(v: View) : RecyclerView.ViewHolder(v) {
         val text: TextView = v.findViewById(R.id.text)
         val fill: View = v.findViewById(R.id.fill)
+        val icon: android.widget.ImageView = v.findViewById(R.id.icon)
     }
 }
