@@ -1,5 +1,15 @@
+# build outputs
 build/
-.gradle/
 app/build/
-local.properties
 *.apk
+*.aab
+# gradle / IDE
+.gradle/
+.idea/
+*.iml
+local.properties
+# signing material — never commit
+keys/
+*.keystore
+*.jks
+signing.properties
