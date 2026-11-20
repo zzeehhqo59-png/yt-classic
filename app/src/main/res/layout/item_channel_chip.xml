@@ -1,0 +1,6 @@
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android" android:layout_width="76dp" android:layout_height="wrap_content"
+    android:orientation="vertical" android:gravity="center_horizontal" android:paddingTop="10dp" android:paddingBottom="8dp" android:background="?attr/selectableItemBackground">
+  <ImageView android:id="@+id/avatar" android:layout_width="52dp" android:layout_height="52dp" android:background="@drawable/bg_avatar" android:importantForAccessibility="no"/>
+  <TextView android:id="@+id/name" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="4dp" android:paddingStart="4dp" android:paddingEnd="4dp"
+      android:gravity="center" android:maxLines="1" android:ellipsize="end" android:textColor="#606060" android:textSize="11sp"/>
+</LinearLayout>

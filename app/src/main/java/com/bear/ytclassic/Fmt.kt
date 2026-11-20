@@ -56,6 +56,9 @@ object Fmt {
         return "${d.dayOfMonth} ${months[d.monthValue - 1]} ${d.year + 543}"
     }
 
+    fun ageMs(ms: Long, fallback: String): String =
+        if (ms <= 0) fallback else age(DateWrapper(java.time.Instant.ofEpochMilli(ms)), fallback)
+
     /** "3 วันที่แล้ว" etc. Falls back to the textual date from YouTube. */
     fun age(date: DateWrapper?, textual: String?): String {
         val t = date?.offsetDateTime() ?: return textual.orEmpty()

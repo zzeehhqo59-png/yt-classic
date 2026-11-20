@@ -13,6 +13,7 @@ class App : Application(), SingletonImageLoader.Factory {
     override fun onCreate() {
         super.onCreate()
         NewPipe.init(DownloaderImpl.init(), Localization("th", "TH"), ContentCountry("TH"))
+        Subs.init(this)
     }
 
     override fun newImageLoader(context: PlatformContext): ImageLoader =

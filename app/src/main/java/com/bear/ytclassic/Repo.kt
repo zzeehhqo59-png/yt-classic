@@ -14,6 +14,8 @@ import org.schabi.newpipe.extractor.stream.ContentAvailability
 import org.schabi.newpipe.extractor.stream.StreamInfo
 import org.schabi.newpipe.extractor.stream.StreamInfoItem
 import org.schabi.newpipe.extractor.stream.StreamType
+import org.schabi.newpipe.extractor.channel.ChannelInfo
+import org.schabi.newpipe.extractor.channel.tabs.ChannelTabs
 import java.io.Serializable
 
 data class VideoItem(
@@ -30,6 +32,7 @@ data class VideoItem(
     val upcoming: Boolean,
     val members: Boolean,
     val scheduledEpochMs: Long,
+    val uploadedMs: Long = 0,
 ) : Serializable
 
 fun List<Image>.pick(target: Int = 360): String? =
@@ -51,6 +54,7 @@ fun StreamInfoItem.toVideo(): VideoItem {
         live = live, upcoming = upcoming,
         members = contentAvailability == ContentAvailability.MEMBERSHIP,
         scheduledEpochMs = if (upcoming) uploadDate?.instant?.toEpochMilli() ?: 0 else 0,
+        uploadedMs = uploadDate?.instant?.toEpochMilli() ?: 0,
     )
 }
 
@@ -63,7 +67,7 @@ interface Pager {
     suspend fun next(): List<VideoItem>
 }
 
-private class ListPager(private val extractor: ListExtractor<out InfoItem>) : Pager {
+class ListPager(private val extractor: ListExtractor<out InfoItem>) : Pager {
     private var page: Page? = null
     private var started = false
     override val hasMore get() = !started || Page.isValid(page)
@@ -119,6 +123,16 @@ object Repo {
 
     suspend fun suggestions(query: String): List<String> = withContext(Dispatchers.IO) {
         yt.suggestionExtractor.suggestionList(query)
+    }
+
+    suspend fun channel(url: String): ChannelInfo = withContext(Dispatchers.IO) { ChannelInfo.getInfo(yt, url) }
+
+    /** Videos tab (no Shorts tab) of a channel. */
+    fun channelVideos(url: String): ListPager = withIdTab(url)
+
+    private fun withIdTab(url: String): ListPager {
+        val id = yt.channelLHFactory.fromUrl(url).id
+        return ListPager(yt.getChannelTabExtractorFromId(id, ChannelTabs.VIDEOS))
     }
 
     suspend fun stream(url: String): StreamInfo = withContext(Dispatchers.IO) {

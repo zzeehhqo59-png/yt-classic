@@ -35,6 +35,10 @@ class MainActivity : AppCompatActivity() {
         nav.setOnItemSelectedListener { show(it.itemId); true }
         nav.setOnItemReselectedListener { if (it.itemId == R.id.nav_home) (supportFragmentManager.findFragmentByTag("home") as? HomeFragment)?.scrollTop() }
         if (savedInstanceState == null) show(R.id.nav_home)
+        lifecycleScope.launch {
+            val n = Subs.importOldAppOnce(applicationContext)
+            if (n != null && n > 0) Toast.makeText(this@MainActivity, "นำเข้าช่องที่ติดตามจากแอปเดิมแล้ว $n ช่อง", Toast.LENGTH_LONG).show()
+        }
     }
 
     private fun show(id: Int) {
@@ -44,8 +48,8 @@ class MainActivity : AppCompatActivity() {
         fm.fragments.forEach { tx.hide(it) }
         val existing = fm.findFragmentByTag(tag)
         if (existing != null) tx.show(existing) else tx.add(R.id.container, when (tag) {
-            "subs" -> PlaceholderFragment.new(R.drawable.ic_subscriptions, R.string.subs_soon_desc)
-            "library" -> PlaceholderFragment.new(R.drawable.ic_library, R.string.library_soon_desc)
+            "subs" -> SubsFragment()
+            "library" -> LibraryFragment()
             else -> HomeFragment()
         }, tag)
         tx.commit()

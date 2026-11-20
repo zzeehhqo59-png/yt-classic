@@ -301,6 +301,7 @@ class WatchActivity : AppCompatActivity() {
         playerView.removeCallbacks(hideSeek); playerView.postDelayed(hideSeek, 700)
     }
 
+    override fun onResume() { super.onResume(); header.notifyItemChanged(0) }
     override fun onStop() { super.onStop(); player.pause() }
     override fun onDestroy() { super.onDestroy(); player.release() }
 
@@ -308,11 +309,11 @@ class WatchActivity : AppCompatActivity() {
     private inner class HeaderAdapter : RecyclerView.Adapter<RecyclerView.ViewHolder>() {
         private var view: View? = null
         private var title = ""; private var views = ""; private var channel = ""; private var subs = ""
-        private var avatar: String? = null; private var likes = ""; private var desc: CharSequence = ""
+        private var avatar: String? = null; private var channelUrl: String? = null; private var subCount = -1L; private var likes = ""; private var desc: CharSequence = ""
         private var expanded = false
 
         fun bindItem(v: VideoItem) {
-            title = v.title; channel = v.channel; avatar = v.avatar
+            title = v.title; channel = v.channel; avatar = v.avatar; channelUrl = v.channelUrl
             views = listOf(Fmt.views(v.views, v.live), v.age).filter { it.isNotBlank() }.joinToString(" · ")
             notifyItemChanged(0)
         }
@@ -323,7 +324,8 @@ class WatchActivity : AppCompatActivity() {
             val date = i.uploadDate?.offsetDateTime()?.let { Fmt.thaiDate(it) } ?: i.textualUploadDate.orEmpty()
             views = listOf(Fmt.fullViews(i.viewCount, live), if (live) "" else date).filter { it.isNotBlank() }.joinToString(" · ")
             channel = i.uploaderName.orEmpty()
-            subs = Fmt.subscribers(i.uploaderSubscriberCount)
+            subs = Fmt.subscribers(i.uploaderSubscriberCount); subCount = i.uploaderSubscriberCount
+            channelUrl = i.uploaderUrl ?: channelUrl
             avatar = i.uploaderAvatars.pick(88) ?: avatar
             likes = if (i.likeCount >= 0) Fmt.shortNum(i.likeCount) else ""
             val d = i.description ?: Description.EMPTY_DESCRIPTION
@@ -364,7 +366,10 @@ class WatchActivity : AppCompatActivity() {
                     .putExtra(Intent.EXTRA_TEXT, item.url), getString(R.string.share)))
             }
             val soon = View.OnClickListener { Toast.makeText(this@WatchActivity, R.string.coming_soon, Toast.LENGTH_SHORT).show() }
-            v.findViewById<View>(R.id.btnSubscribe).setOnClickListener(soon)
+            v.findViewById<TextView>(R.id.btnSubscribe).bindSubscribe({
+                channelUrl?.let { u -> Channel(u, channel, avatar, subCount) }
+            })
+            v.findViewById<View>(R.id.channelRow).setOnClickListener { openChannel(channelUrl, channel, avatar) }
             v.findViewById<View>(R.id.btnLike).setOnClickListener(soon)
             v.findViewById<View>(R.id.btnDislike).setOnClickListener(soon)
         }

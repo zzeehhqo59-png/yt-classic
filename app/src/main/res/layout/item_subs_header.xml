@@ -1,0 +1,5 @@
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android" android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="vertical">
+  <androidx.recyclerview.widget.RecyclerView android:id="@+id/channels" android:layout_width="match_parent" android:layout_height="wrap_content" android:paddingStart="4dp" android:clipToPadding="false"/>
+  <View android:layout_width="match_parent" android:layout_height="1dp" android:background="#E5E5E5"/>
+  <View android:layout_width="match_parent" android:layout_height="8dp"/>
+</LinearLayout>

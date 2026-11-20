@@ -76,9 +76,9 @@ class VideoAdapter(
             val extra = if (it.members) "เฉพาะสมาชิก" else ""
             if (channel != null) {
                 channel.text = it.channel
-                meta.text = listOf(views, it.age, extra).filter { s -> s.isNotBlank() }.joinToString(" · ")
+                meta.text = listOf(views, Fmt.ageMs(it.uploadedMs, it.age).takeUnless { _ -> it.live }.orEmpty(), extra).filter { s -> s.isNotBlank() }.joinToString(" · ")
             } else {
-                meta.text = listOf(it.channel, views, it.age, extra).filter { s -> s.isNotBlank() }.joinToString(" · ")
+                meta.text = listOf(it.channel, views, Fmt.ageMs(it.uploadedMs, it.age).takeUnless { _ -> it.live }.orEmpty(), extra).filter { s -> s.isNotBlank() }.joinToString(" · ")
             }
             avatar?.loadAvatar(it.avatar)
             itemView.setOnClickListener { _ -> onClick(it) }

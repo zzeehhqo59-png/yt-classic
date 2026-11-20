@@ -1,0 +1,14 @@
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android" android:layout_width="match_parent" android:layout_height="match_parent">
+  <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="vertical" android:padding="16dp">
+    <TextView android:layout_width="match_parent" android:layout_height="wrap_content" android:text="การติดตาม" android:textColor="#0F0F0F" android:textSize="18sp" android:textStyle="bold"/>
+    <TextView android:id="@+id/subsCount" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="4dp" android:textColor="#606060" android:textSize="14sp"/>
+    <com.google.android.material.button.MaterialButton android:id="@+id/btnImport" style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+        android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="12dp" android:text="นำเข้าการติดตามจากไฟล์"
+        android:textColor="#CC0000" app:strokeColor="#CC0000" xmlns:app="http://schemas.android.com/apk/res-auto"/>
+    <TextView android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="6dp" android:textColor="#606060" android:textSize="13sp"
+        android:text="รองรับไฟล์ส่งออกการติดตามของ NewPipe (.json) และไฟล์ subscriptions.csv จาก Google Takeout ช่องที่ติดตามอยู่แล้วจะไม่ถูกเพิ่มซ้ำ"/>
+    <View android:layout_width="match_parent" android:layout_height="1dp" android:layout_marginTop="20dp" android:layout_marginBottom="20dp" android:background="#E5E5E5"/>
+    <TextView android:layout_width="match_parent" android:layout_height="wrap_content" android:text="ประวัติการดู เพลย์ลิสต์ และวิดีโอที่ดาวน์โหลด" android:textColor="#0F0F0F" android:textSize="16sp"/>
+    <TextView android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="4dp" android:text="@string/coming_soon" android:textColor="#606060" android:textSize="14sp"/>
+  </LinearLayout>
+</ScrollView>
