@@ -56,6 +56,8 @@ class WatchActivity : AppCompatActivity() {
         override fun openComments() = this@WatchActivity.openComments()
         override fun moreSheet() { this@WatchActivity.moreSheet() }
         override fun share() = shareUrl(item.url)
+        override fun rating() = Likes.state(item.url)
+        override fun rate(value: Int) = this@WatchActivity.rate(value)
         override fun onComments(title: String?, preview: String?, avatar: String?) = ctl.updateLandComments(title, preview, avatar)
     })
     private val comments: WatchComments = WatchComments(this) { t, p, av -> header.setComments(t, p, av) }
@@ -104,6 +106,8 @@ class WatchActivity : AppCompatActivity() {
             override fun moreSheet() { this@WatchActivity.moreSheet() }
             override fun share() = shareUrl(item.url)
             override fun toggleFullscreen() = this@WatchActivity.toggleFullscreen()
+            override fun rating() = Likes.state(item.url)
+            override fun rate(value: Int) = this@WatchActivity.rate(value)
         })
         ctl.setup()
         ctl.setupGestures()
@@ -182,6 +186,20 @@ class WatchActivity : AppCompatActivity() {
         ctl.renderItem(it)
     }
 
+
+    /** 👍 / 👎 on this phone: liked videos are listed on the คุณ tab. */
+    private fun rate(value: Int) {
+        val v = Playback.state.value.item?.takeIf { it.url == item.url } ?: item
+        val now = Likes.toggle(v, value)
+        val msg = when {
+            now == Likes.LIKE -> "เพิ่มในวิดีโอที่ชอบแล้ว"
+            now == Likes.DISLIKE -> "คุณไม่ชอบวิดีโอนี้"
+            value == Likes.LIKE -> "นำออกจากวิดีโอที่ชอบแล้ว"
+            else -> "ยกเลิกการไม่ชอบแล้ว"
+        }
+        android.widget.Toast.makeText(this, msg, android.widget.Toast.LENGTH_SHORT).show()
+        header.notifyItemChanged(0); ctl.updateRating()
+    }
 
     private fun openComments() = comments.open(boundInfo?.url, playerBox.bottom + root.paddingTop)
 

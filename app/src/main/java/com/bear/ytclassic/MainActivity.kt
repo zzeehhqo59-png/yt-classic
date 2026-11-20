@@ -270,11 +270,18 @@ class HomeFragment : Fragment() {
         refresh.setColorSchemeColors(0xFFFF0000.toInt())
         refresh.setOnRefreshListener { reload(view, fromSwipe = true) }
         view.findViewById<View>(R.id.btnRetry).setOnClickListener { reload(view) }
+        view.findViewById<View>(R.id.btnEmptySearch).setOnClickListener { startActivity(Intent(requireContext(), SearchActivity::class.java)) }
         reload(view)
     }
 
-    override fun onResume() { super.onResume(); if (::adapter.isInitialized) adapter.refreshProgress() }
-    override fun onHiddenChanged(hidden: Boolean) { if (!hidden && ::adapter.isInitialized) adapter.refreshProgress() }
+    override fun onResume() { super.onResume(); if (::adapter.isInitialized) adapter.refreshProgress(); recheckEmpty() }
+    override fun onHiddenChanged(hidden: Boolean) { if (!hidden && ::adapter.isInitialized) { adapter.refreshProgress(); recheckEmpty() } }
+
+    /** New user: no history and no subscriptions yet. */
+    private fun isNewUser() = History.count() == 0 && Subs.count() == 0
+    private var emptyShown = false
+    /** Leave the "ลองค้นหา" card as soon as there is something to recommend from. */
+    private fun recheckEmpty() { val v = view ?: return; if (emptyShown && !isNewUser()) reload(v) }
 
     fun scrollTop() { if (::list.isInitialized) list.smoothScrollToPosition(0) }
 
@@ -284,6 +291,9 @@ class HomeFragment : Fragment() {
         val errorBox = view.findViewById<View>(R.id.errorBox)
         val refresh = view.findViewById<SwipeRefreshLayout>(R.id.refresh)
         errorBox.visibility = View.GONE
+        emptyShown = isNewUser()
+        view.findViewById<View>(R.id.emptyCard).visibility = if (emptyShown) View.VISIBLE else View.GONE
+        if (emptyShown) { adapter.set(emptyList()); refresh.isRefreshing = false; progress.visibility = View.GONE; return }
         if (!fromSwipe) progress.visibility = View.VISIBLE
         job = viewLifecycleOwner.lifecycleScope.launch {
             try {
@@ -312,7 +322,7 @@ class HomeFragment : Fragment() {
         job = viewLifecycleOwner.lifecycleScope.launch {
             try { val more = p.next(); adapter.loadingMore = false; adapter.add(more) }
             catch (e: kotlinx.coroutines.CancellationException) { throw e }
-            catch (_: Throwable) { }
+            catch (e: Throwable) { android.util.Log.w("HomeFragment", "next page failed", e) }
             finally { adapter.loadingMore = false }
         }
     }

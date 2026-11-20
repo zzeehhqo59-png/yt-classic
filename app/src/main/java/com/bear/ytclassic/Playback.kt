@@ -114,9 +114,12 @@ object Playback {
     private val back = ArrayList<VideoItem>()
     private var goingBack = false
     fun hasPrev() = back.isNotEmpty()
-    /** Up next = the first playable related video. */
-    fun nextItem(): VideoItem? = if (offline) null else _state.value.info?.relatedItems?.videosOnly()
-        ?.firstOrNull { it.unplayableBadge() == null && !it.live && !it.upcoming }
+    /** Up next = the next playable video of the "เล่นทั้งหมด" queue, else the first playable related video. */
+    fun nextItem(): VideoItem? = when {
+        offline -> null
+        PlayQueue.active -> PlayQueue.peekNext()
+        else -> _state.value.info?.relatedItems?.videosOnly()?.firstOrNull { it.unplayableBadge() == null && !it.live && !it.upcoming }
+    }
     fun next() { nextItem()?.let { open(it) } }
     /** ⏮: restart the video if it has played a while, else go back to the previous one. */
     fun prev() {
@@ -179,6 +182,7 @@ object Playback {
 
     /** Start playing [item]; does nothing if it is already the current video. */
     fun open(item: VideoItem) {
+        PlayQueue.onOpen(item.url)
         if (_state.value.item?.url == item.url && _state.value.error == null) return
         _state.value.item?.let { if (it.url != item.url && !goingBack) { back.add(it); if (back.size > 50) back.removeAt(0) } }
         savePosition()
@@ -212,6 +216,7 @@ object Playback {
                     app.stopService(Intent(app, PlaybackService::class.java))
                     return@launch
                 }
+                Availability.clear(item.url)
                 val def = defaultIndex()
                 val saved = if (live) 0 else History.position(item.url)
                 val durMs = full.durationSec * 1000
@@ -221,8 +226,18 @@ object Playback {
             } catch (e: Throwable) {
                 _state.value = _state.value.copy(loading = false, error = Errors.video(e, item))
                 app.stopService(Intent(app, PlaybackService::class.java))
+                onUnavailable(item, Availability.kindFromError(e))
             }
         }
+    }
+
+    /** Remember a deleted / private video; while playing a playlist, move on to the next one. */
+    private fun onUnavailable(item: VideoItem, kind: Int) {
+        if (kind == Availability.OK) return
+        Availability.mark(item.url, kind)
+        if (PlayQueue.active && PlayQueue.peekNext() != null) handler.postDelayed({
+            if (_state.value.item?.url == item.url && _state.value.error != null) next()
+        }, 1500)
     }
 
     fun play(index: Int, positionMs: Long) {

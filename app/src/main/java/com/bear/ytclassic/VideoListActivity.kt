@@ -10,6 +10,7 @@ import android.widget.Toast
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import androidx.lifecycle.lifecycleScope
+import androidx.recyclerview.widget.ConcatAdapter
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import kotlinx.coroutines.CancellationException
@@ -18,17 +19,21 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
-/** Watch history, a local playlist (incl. ดูภายหลัง) or a YouTube playlist. */
+/** Watch history, liked videos, a local playlist (incl. ดูภายหลัง) or a YouTube playlist. */
 class VideoListActivity : AppCompatActivity() {
     companion object {
         fun history(c: Context) = Intent(c, VideoListActivity::class.java).putExtra("mode", "history")
         fun local(c: Context, id: Long) = Intent(c, VideoListActivity::class.java).putExtra("mode", "local").putExtra("id", id)
+        fun liked(c: Context) = Intent(c, VideoListActivity::class.java).putExtra("mode", "liked")
         fun remote(c: Context, url: String, title: String) = Intent(c, VideoListActivity::class.java).putExtra("mode", "remote").putExtra("url", url).putExtra("title", title)
     }
 
     private lateinit var mode: String
     private var plId = 0L
     private lateinit var adapter: VideoAdapter
+    private val header = PlaylistHeaderAdapter { playFrom(0) }
+    private var remoteOwner: String? = null
+    private var remoteCount = -1
     private lateinit var message: TextView
     private lateinit var progress: View
     private var pager: ListPager? = null
@@ -44,14 +49,16 @@ class VideoListActivity : AppCompatActivity() {
         message = findViewById(R.id.message)
         progress = findViewById(R.id.progress)
         findViewById<View>(R.id.btnBack).setOnClickListener { finish() }
-        adapter = VideoAdapter(false, onMore = { v, item -> moreFor(v, item) }) { openVideo(it) }
+        adapter = VideoAdapter(false, onMore = { v, item -> moreFor(v, item) }, canHide = mode == "history") { v ->
+            if (mode == "history") openVideo(v) else playFrom(adapter.items.indexOfFirst { it.url == v.url })
+        }
         val list = findViewById<RecyclerView>(R.id.list)
         list.layoutManager = LinearLayoutManager(this)
-        list.adapter = adapter
+        list.adapter = if (mode == "history") adapter else ConcatAdapter(header, adapter)
         val menu = findViewById<View>(R.id.btnMenu)
         when (mode) {
             "history" -> { setTitleText("ประวัติการดู"); menu.visibility = View.VISIBLE; menu.setOnClickListener { topMenu(it) } }
-            "local" -> { menu.visibility = View.VISIBLE; menu.setOnClickListener { topMenu(it) } }
+            "local", "liked" -> { menu.visibility = View.VISIBLE; menu.setOnClickListener { topMenu(it) } }
             else -> { setTitleText(intent.getStringExtra("title").orEmpty()); list.onNearEnd { loadMore() }; loadRemote() }
         }
     }
@@ -72,21 +79,56 @@ class VideoListActivity : AppCompatActivity() {
             items = History.recent(1000).map { it.video.copy(age = "ดูเมื่อ " + Fmt.ageMs(it.watchedAt, "")) }
             setTitleText("ประวัติการดู", if (items.isNotEmpty()) "${items.size} วิดีโอ" else null)
             message.text = "ยังไม่มีวิดีโอที่ดู\nวิดีโอที่คุณดูจะแสดงที่นี่"
+        } else if (mode == "liked") {
+            items = Availability.apply(Likes.liked())
+            setTitleText("วิดีโอที่ชอบ", "${items.size} วิดีโอ")
+            message.text = "ยังไม่มีวิดีโอที่ชอบ\nกด 👍 ในหน้าวิดีโอเพื่อเก็บไว้ที่นี่"
+            setHeader("วิดีโอที่ชอบ", null, items)
         } else {
             val pl = Playlists.get(plId) ?: run { finish(); return }
-            items = Playlists.items(plId)
+            items = Availability.apply(Playlists.items(plId))
             setTitleText(pl.name, "${items.size} วิดีโอ")
             message.text = if (plId == Playlists.WATCH_LATER) "ยังไม่มีวิดีโอในดูภายหลัง\nกด ⋮ ที่วิดีโอแล้วเลือก \"บันทึกลงในดูภายหลัง\"" else "เพลย์ลิสต์นี้ยังว่างอยู่"
+            setHeader(pl.name, null, items)
         }
         adapter.progress = History.progressMap()
         adapter.set(items.map { if (mode == "history") it.copy(uploadedMs = 0) else it })
         message.visibility = if (items.isEmpty()) View.VISIBLE else View.GONE
     }
 
+    private fun setHeader(title: String, owner: String?, items: List<VideoItem>, count: Int = items.size) {
+        val cover = items.firstOrNull { PlayQueue.isPlayable(it) && it.thumb != null }?.thumb ?: items.firstOrNull()?.thumb
+        header.set(PlaylistHeaderAdapter.Info(title, owner, count, cover, items.any { PlayQueue.isPlayable(it) }))
+    }
+
+    /** "เล่นทั้งหมด" / tapping a video: play the list in order from [index], skipping videos that can't be played. */
+    private fun playFrom(index: Int) {
+        val items = adapter.items.toList()
+        val tapped = items.getOrNull(index)
+        if (tapped != null && tapped.unavailable) {
+            Toast.makeText(this, tapped.unplayableBadge() ?: "วิดีโอนี้ไม่พร้อมใช้งาน", Toast.LENGTH_SHORT).show(); return
+        }
+        val first = PlayQueue.start(items, index.coerceAtLeast(0))
+        if (first == null) Toast.makeText(this, "ไม่มีวิดีโอที่เล่นได้ในเพลย์ลิสต์นี้", Toast.LENGTH_SHORT).show() else openVideo(first)
+    }
+
+    /** Saved lists: drop every deleted / private video at once. */
+    private fun removeUnavailable() {
+        val bad = adapter.items.filter { it.unavailable }
+        if (bad.isEmpty()) { Toast.makeText(this, "ไม่มีวิดีโอที่ไม่พร้อมใช้งาน", Toast.LENGTH_SHORT).show(); return }
+        AlertDialog.Builder(this).setMessage("นำวิดีโอที่ไม่พร้อมใช้งาน ${bad.size} รายการออกใช่ไหม")
+            .setPositiveButton("นำออก") { _, _ ->
+                bad.forEach { if (mode == "liked") Likes.set(it, 0) else Playlists.remove(plId, it.url) }
+                Toast.makeText(this, "นำออกแล้ว ${bad.size} รายการ", Toast.LENGTH_SHORT).show()
+                reloadLocal()
+            }.setNegativeButton("ยกเลิก", null).show()
+    }
+
     private fun moreFor(anchor: View, v: VideoItem) {
         val extra = when (mode) {
             "history" -> listOf("นำออกจากประวัติการดู" to { History.remove(v.url); reloadLocal() })
             "local" -> listOf("นำออกจาก ${Playlists.get(plId)?.name.orEmpty()}" to { Playlists.remove(plId, v.url); reloadLocal() })
+            "liked" -> listOf("นำออกจากวิดีโอที่ชอบ" to { Likes.set(v, 0); reloadLocal() })
             else -> emptyList()
         }
         anchor.showVideoMenu(v, extra)
@@ -97,6 +139,8 @@ class VideoListActivity : AppCompatActivity() {
         if (mode == "history") {
             m.menu.add("ล้างประวัติการดูทั้งหมด").setOnMenuItemClickListener { confirmClearHistory(this) { reloadLocal() }; true }
         } else {
+            m.menu.add("นำวิดีโอที่ไม่พร้อมใช้งานออกทั้งหมด").setOnMenuItemClickListener { removeUnavailable(); true }
+            if (mode == "liked") { m.show(); return }
             if (plId != Playlists.WATCH_LATER) {
                 m.menu.add("เปลี่ยนชื่อ").setOnMenuItemClickListener {
                     askName("เปลี่ยนชื่อเพลย์ลิสต์", Playlists.get(plId)?.name.orEmpty()) { Playlists.rename(plId, it); reloadLocal() }; true
@@ -121,12 +165,15 @@ class VideoListActivity : AppCompatActivity() {
             try {
                 val p = withContext(Dispatchers.IO) { Repo.playlistPager(intent.getStringExtra("url")!!) }
                 pager = p
-                val items = p.next()
+                val items = Availability.apply(p.next())
                 val name = runCatching { p.extractor.name }.getOrNull()
-                val count = runCatching { (p.extractor as org.schabi.newpipe.extractor.playlist.PlaylistExtractor).streamCount }.getOrDefault(-1)
-                setTitleText(name ?: intent.getStringExtra("title").orEmpty(), if (count > 0) "$count วิดีโอ" else null)
+                val pe = p.extractor as? org.schabi.newpipe.extractor.playlist.PlaylistExtractor
+                remoteCount = pe?.let { runCatching { it.streamCount.toInt() }.getOrDefault(-1) } ?: -1
+                remoteOwner = pe?.let { runCatching { it.uploaderName }.getOrNull() }
+                setTitleText(name ?: intent.getStringExtra("title").orEmpty(), if (remoteCount > 0) "$remoteCount วิดีโอ" else null)
                 adapter.progress = History.progressMap()
                 adapter.set(items)
+                setHeader(name ?: intent.getStringExtra("title").orEmpty(), remoteOwner, items, if (remoteCount >= 0) remoteCount else items.size)
                 if (items.isEmpty()) { message.text = "เพลย์ลิสต์นี้ไม่มีวิดีโอ"; message.visibility = View.VISIBLE }
             } catch (e: CancellationException) { throw e
             } catch (e: Throwable) {
@@ -140,9 +187,9 @@ class VideoListActivity : AppCompatActivity() {
         if (job?.isActive == true || !p.hasMore) return
         adapter.loadingMore = true
         job = lifecycleScope.launch {
-            try { val more = p.next(); adapter.loadingMore = false; adapter.add(more) }
+            try { val more = Availability.apply(p.next()); adapter.loadingMore = false; adapter.add(more) }
             catch (e: CancellationException) { throw e }
-            catch (_: Throwable) { }
+            catch (e: Throwable) { android.util.Log.w("VideoListActivity", "next page failed", e) }
             finally { adapter.loadingMore = false }
         }
     }

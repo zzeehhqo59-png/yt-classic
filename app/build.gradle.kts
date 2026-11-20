@@ -18,8 +18,8 @@ android {
         applicationId = "com.bear.ytclassic"
         minSdk = 23
         targetSdk = 35
-        versionCode = 5001
-        versionName = "4.0.1"
+        versionCode = 6000
+        versionName = "5.0.0"
     }
 
     signingConfigs {
@@ -61,6 +61,7 @@ android {
 
 dependencies {
     coreLibraryDesugaring("com.android.tools:desugar_jdk_libs_nio:2.1.5")
+    testImplementation("junit:junit:4.13.2")
     implementation("com.github.TeamNewPipe:NewPipeExtractor:v0.27.1")
     implementation("com.squareup.okhttp3:okhttp:5.5.1")
     implementation("androidx.appcompat:appcompat:1.8.0")

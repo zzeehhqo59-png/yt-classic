@@ -1,4 +1,4 @@
-<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android" android:layout_width="match_parent" android:layout_height="match_parent">
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android" xmlns:app="http://schemas.android.com/apk/res-auto" android:layout_width="match_parent" android:layout_height="match_parent">
   <androidx.swiperefreshlayout.widget.SwipeRefreshLayout android:id="@+id/refresh" android:layout_width="match_parent" android:layout_height="match_parent">
     <androidx.recyclerview.widget.RecyclerView android:id="@+id/list" android:layout_width="match_parent" android:layout_height="match_parent" android:clipToPadding="false"/>
   </androidx.swiperefreshlayout.widget.SwipeRefreshLayout>
@@ -8,5 +8,16 @@
     <TextView android:id="@+id/errorText" android:layout_width="wrap_content" android:layout_height="wrap_content" android:gravity="center" android:textColor="@color/text2" android:textSize="15sp"/>
     <Button android:id="@+id/btnRetry" style="@style/Widget.MaterialComponents.Button.TextButton" android:layout_width="wrap_content" android:layout_height="wrap_content"
         android:layout_marginTop="8dp" android:text="@string/retry" android:textColor="@color/link"/>
+  </LinearLayout>
+  <LinearLayout android:id="@+id/emptyCard" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_gravity="center_horizontal"
+      android:layout_marginStart="16dp" android:layout_marginEnd="16dp" android:layout_marginTop="24dp" android:orientation="vertical" android:gravity="center_horizontal"
+      android:padding="24dp" android:background="@drawable/bg_card_round" android:visibility="gone">
+    <ImageView android:layout_width="48dp" android:layout_height="48dp" android:src="@drawable/ic_search" app:tint="@color/text2" android:importantForAccessibility="no"/>
+    <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="12dp" android:text="ลองค้นหาเพื่อเริ่มต้นใช้งาน"
+        android:textColor="@color/text1" android:textSize="18sp" android:textStyle="bold" android:gravity="center"/>
+    <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="8dp" android:gravity="center"
+        android:text="เริ่มดูวิดีโอหรือติดตามช่องที่ชอบ แล้วหน้าแรกจะแนะนำวิดีโอที่เหมาะกับคุณ" android:textColor="@color/text2" android:textSize="14sp"/>
+    <com.google.android.material.button.MaterialButton android:id="@+id/btnEmptySearch" android:layout_width="wrap_content" android:layout_height="wrap_content"
+        android:layout_marginTop="16dp" android:text="ค้นหา" android:textColor="#FFFFFF" app:backgroundTint="#CC0000" app:cornerRadius="20dp" app:icon="@drawable/ic_search" app:iconTint="#FFFFFF"/>
   </LinearLayout>
 </FrameLayout>

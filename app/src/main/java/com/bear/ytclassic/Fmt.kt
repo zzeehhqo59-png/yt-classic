@@ -9,6 +9,12 @@ import kotlin.math.floor
 
 /** Thai number / date formatting in the style of the old Thai YouTube app. */
 object Fmt {
+    /** "@handle" when the channel link has one (youtube.com/@name), otherwise the channel name as it is. */
+    fun channelLabel(name: String, url: String?): String {
+        val h = url?.substringAfter("/@", "")?.substringBefore('/')?.substringBefore('?')?.trim().orEmpty()
+        return if (h.isNotEmpty()) "@" + java.net.URLDecoder.decode(h, "UTF-8") else name
+    }
+
     private val months = arrayOf("ม.ค.", "ก.พ.", "มี.ค.", "เม.ย.", "พ.ค.", "มิ.ย.", "ก.ค.", "ส.ค.", "ก.ย.", "ต.ค.", "พ.ย.", "ธ.ค.")
 
     private fun oneDecimal(v: Double): String {

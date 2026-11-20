@@ -41,6 +41,8 @@ data class VideoItem(
     val paid: Boolean = false,
     /** Private / deleted entries (e.g. in playlists). */
     val unavailable: Boolean = false,
+    /** With [unavailable]: the video is private (otherwise deleted / removed). */
+    val privateVideo: Boolean = false,
 ) : Serializable
 
 /** Thai badge for a list item that can't be watched here (null = playable as far as the list tells). */
@@ -49,11 +51,10 @@ fun VideoItem.unplayableBadge(): String? = when {
     members -> "เฉพาะสมาชิก"
     paid -> "ต้องซื้อ"
     upcoming -> "รอเปิดตัว"
-    unavailable -> "ดูไม่ได้"
+    unavailable -> if (privateVideo) "วิดีโอส่วนตัว" else "วิดีโอนี้ไม่พร้อมใช้งาน"
     else -> null
 }
 
-private val UNAVAILABLE_TITLES = listOf("[private video]", "[deleted video]", "[unavailable video]", "[วิดีโอส่วนตัว]", "[วิดีโอที่ถูกลบ]", "[วิดีโอที่ไม่พร้อมใช้งาน]")
 
 fun List<Image>.pick(target: Int = 360): String? =
     filter { it.url.isNotBlank() }
@@ -74,7 +75,8 @@ fun StreamInfoItem.toVideo(): VideoItem {
         live = live, upcoming = upcoming,
         members = contentAvailability == ContentAvailability.MEMBERSHIP,
         paid = contentAvailability == ContentAvailability.PAID,
-        unavailable = name.orEmpty().trim().lowercase().let { t -> UNAVAILABLE_TITLES.any { t == it } },
+        unavailable = Availability.kindFromTitle(name) != Availability.OK,
+        privateVideo = Availability.kindFromTitle(name) == Availability.PRIVATE,
         scheduledEpochMs = if (upcoming) uploadDate?.instant?.toEpochMilli() ?: 0 else 0,
         uploadedMs = uploadDate?.instant?.toEpochMilli() ?: 0,
     )

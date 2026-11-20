@@ -59,7 +59,7 @@ class SettingsActivity : AppCompatActivity() {
         val dir = Downloads.dir(this).path
         item("ตำแหน่งที่บันทึก", dir.substringAfter("/emulated/0/").let { if (it == dir) dir else "ที่เก็บข้อมูลภายใน/$it" }) {
             AlertDialog.Builder(this).setTitle("ตำแหน่งที่บันทึก")
-                .setMessage("ไฟล์ที่ดาวน์โหลดเก็บไว้ในพื้นที่ของแอปนี้:\n\n$dir\n\nดูแบบออฟไลน์ได้ที่ คลังวิดีโอ > การดาวน์โหลด\nไฟล์จะถูกลบเมื่อถอนการติดตั้งแอป")
+                .setMessage("ไฟล์ที่ดาวน์โหลดเก็บไว้ในพื้นที่ของแอปนี้:\n\n$dir\n\nดูแบบออฟไลน์ได้ที่ แท็บคุณ > การดาวน์โหลด\nไฟล์จะถูกลบเมื่อถอนการติดตั้งแอป")
                 .setPositiveButton("ตกลง", null).show()
         }
 

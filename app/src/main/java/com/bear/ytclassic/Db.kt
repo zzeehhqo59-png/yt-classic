@@ -18,13 +18,19 @@ object Db {
     private const val VDEF = "url TEXT NOT NULL, title TEXT, channel TEXT, channel_url TEXT, thumb TEXT, avatar TEXT, duration INTEGER, views INTEGER, uploaded_ms INTEGER"
 
     fun init(c: Context) {
-        helper = object : SQLiteOpenHelper(c.applicationContext, "ytclassic.db", null, 3) {
+        helper = object : SQLiteOpenHelper(c.applicationContext, "ytclassic.db", null, 4) {
             override fun onCreate(db: SQLiteDatabase) {
                 db.execSQL("CREATE TABLE subs (url TEXT PRIMARY KEY, name TEXT NOT NULL, avatar TEXT, subscribers INTEGER NOT NULL DEFAULT -1, added INTEGER NOT NULL)")
-                createV2(db); createV3(db)
+                createV2(db); createV3(db); createV4(db)
             }
-            override fun onUpgrade(db: SQLiteDatabase, o: Int, n: Int) { if (o < 2) createV2(db); if (o < 3) createV3(db) }
+            override fun onUpgrade(db: SQLiteDatabase, o: Int, n: Int) { if (o < 2) createV2(db); if (o < 3) createV3(db); if (o < 4) createV4(db) }
         }
+    }
+
+    /** 5.0: local likes and remembered deleted / private videos. */
+    private fun createV4(db: SQLiteDatabase) {
+        db.execSQL("CREATE TABLE IF NOT EXISTS likes ($VDEF, value INTEGER NOT NULL, at INTEGER NOT NULL, PRIMARY KEY(url))")
+        db.execSQL("CREATE TABLE IF NOT EXISTS unavailable (url TEXT PRIMARY KEY, kind INTEGER NOT NULL, at INTEGER NOT NULL)")
     }
 
     private fun createV2(db: SQLiteDatabase) {
@@ -91,6 +97,13 @@ object History {
         Db.r.rawQuery("SELECT ${Db.VCOLS}, watched_at, watch_count FROM history ORDER BY watched_at DESC LIMIT $limit", null).use { c ->
             buildList { while (c.moveToNext()) add(Entry(Db.video(c), c.getLong(9), c.getInt(10))) }
         }
+
+    /** url -> title for the given videos that are in the history. */
+    fun titles(urls: List<String>): Map<String, String> = urls.chunked(500).flatMap { part ->
+        Db.r.rawQuery("SELECT url, title FROM history WHERE url IN (${part.joinToString(",") { "?" }})", part.toTypedArray()).use { c ->
+            buildList { while (c.moveToNext()) add(c.getString(0) to c.getString(1).orEmpty()) }
+        }
+    }.toMap()
 
     fun watchedUrls(): Set<String> = Db.r.rawQuery("SELECT url FROM history", null).use { c -> buildSet { while (c.moveToNext()) add(c.getString(0)) } }
     fun remove(url: String) { Db.w.delete("history", "url=?", arrayOf(url)); version++ }

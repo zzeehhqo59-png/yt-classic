@@ -7,7 +7,6 @@ import android.view.View
 import android.view.ViewGroup
 import android.widget.ImageView
 import android.widget.TextView
-import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.text.HtmlCompat
 import androidx.recyclerview.widget.RecyclerView
@@ -21,6 +20,9 @@ class WatchHeaderAdapter(private val a: AppCompatActivity, private val cb: Callb
         fun openComments()
         fun moreSheet()
         fun share()
+        /** Local rating of the current video: 1 ถูกใจ, -1 ไม่ชอบ, 0 none. */
+        fun rating(): Int
+        fun rate(value: Int)
         /** The comments card changed (the landscape row mirrors it). */
         fun onComments(title: String?, preview: String?, avatar: String?)
     }
@@ -37,7 +39,7 @@ class WatchHeaderAdapter(private val a: AppCompatActivity, private val cb: Callb
 
     fun bindItem(v: VideoItem) {
         title = v.title; channel = v.channel; avatar = v.avatar; channelUrl = v.channelUrl
-        meta = listOf(v.channel, Fmt.views(v.views, v.live), Fmt.ageMs(v.uploadedMs, v.age).takeUnless { v.live }.orEmpty()).filter { it.isNotBlank() }.joinToString("  ")
+        meta = listOf(Fmt.channelLabel(v.channel, v.channelUrl), Fmt.views(v.views, v.live), Fmt.ageMs(v.uploadedMs, v.age).takeUnless { v.live }.orEmpty()).filter { it.isNotBlank() }.joinToString("  ")
         if (stats.isEmpty()) stats = meta
         notifyItemChanged(0)
     }
@@ -47,7 +49,7 @@ class WatchHeaderAdapter(private val a: AppCompatActivity, private val cb: Callb
         title = i.name
         channel = i.uploaderName.orEmpty()
         val age = if (live) "" else Fmt.age(i.uploadDate, i.textualUploadDate)
-        meta = listOf(channel, Fmt.views(i.viewCount, live), age).filter { it.isNotBlank() }.joinToString("  ")
+        meta = listOf(Fmt.channelLabel(channel, i.uploaderUrl ?: channelUrl), Fmt.views(i.viewCount, live), age).filter { it.isNotBlank() }.joinToString("  ")
         val date = i.uploadDate?.offsetDateTime()?.let { Fmt.thaiDate(it) } ?: i.textualUploadDate.orEmpty()
         stats = listOf(channel, Fmt.subscribers(i.uploaderSubscriberCount), Fmt.fullViews(i.viewCount, live), if (live) "" else date,
             if (i.likeCount >= 0) "ถูกใจ ${Fmt.shortNum(i.likeCount)}" else "").filter { it.isNotBlank() }.joinToString(" · ")
@@ -88,15 +90,20 @@ class WatchHeaderAdapter(private val a: AppCompatActivity, private val cb: Callb
         v.findViewById<TextView>(R.id.previewText).text = cPreview
         v.findViewById<ImageView>(R.id.previewAvatar).apply { visibility = if (cAvatar == null) View.GONE else View.VISIBLE; loadAvatar(cAvatar) }
         cRow.setOnClickListener { cb.openComments() }
-        val soon = View.OnClickListener { Toast.makeText(a, R.string.coming_soon, Toast.LENGTH_SHORT).show() }
         v.findViewById<TextView>(R.id.btnSubscribe).bindSubscribe({
             channelUrl?.let { u -> Channel(u, channel, avatar, subCount) }
         }, capsule = true)
-        v.findViewById<View>(R.id.btnLike).setOnClickListener(soon)
-        v.findViewById<View>(R.id.btnDislike).setOnClickListener(soon)
+        val r = cb.rating()
+        v.findViewById<ImageView>(R.id.likeIcon).setColorFilter(rateColor(a, r == Likes.LIKE, R.color.text1))
+        v.findViewById<ImageView>(R.id.btnDislike).setColorFilter(rateColor(a, r == Likes.DISLIKE, R.color.text1))
+        v.findViewById<View>(R.id.btnLike).setOnClickListener { cb.rate(Likes.LIKE) }
+        v.findViewById<View>(R.id.btnDislike).setOnClickListener { cb.rate(Likes.DISLIKE) }
     }
 
 }
+
+/** 👍 / 👎 tint: blue when chosen (like the old app), otherwise [normal]. */
+fun rateColor(c: Context, on: Boolean, normal: Int): Int = androidx.core.content.ContextCompat.getColor(c, if (on) R.color.rated else normal)
 
 /** "...เพิ่มเติม": full title, counts, date and description in a sheet. */
 fun Context.descriptionSheet(title: String, stats: String, desc: CharSequence) = sheet { box, _ ->

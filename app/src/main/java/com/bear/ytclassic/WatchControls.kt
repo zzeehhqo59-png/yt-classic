@@ -32,6 +32,8 @@ class WatchControls(private val a: AppCompatActivity, private val playerView: St
         fun moreSheet()
         fun share()
         fun toggleFullscreen()
+        fun rating(): Int
+        fun rate(value: Int)
     }
 
     private val player get() = Playback.player
@@ -130,9 +132,8 @@ class WatchControls(private val a: AppCompatActivity, private val playerView: St
         a.findViewById<View>(R.id.btnBack).setOnClickListener { host.toggleFullscreen() }
         // landscape bottom row
         a.findViewById<View>(R.id.landComments).setOnClickListener { host.openComments() }
-        val soon = View.OnClickListener { Toast.makeText(a, R.string.coming_soon, Toast.LENGTH_SHORT).show() }
-        a.findViewById<View>(R.id.landLike).setOnClickListener(soon)
-        a.findViewById<View>(R.id.landDislike).setOnClickListener(soon)
+        a.findViewById<View>(R.id.landLike).setOnClickListener { host.rate(Likes.LIKE); scheduleHide() }
+        a.findViewById<View>(R.id.landDislike).setOnClickListener { host.rate(Likes.DISLIKE); scheduleHide() }
         a.findViewById<View>(R.id.landShare).setOnClickListener { host.share() }
         a.findViewById<View>(R.id.landMore).setOnClickListener { host.moreSheet() }
         a.findViewById<View>(R.id.landNext).setOnClickListener { Playback.next() }
@@ -366,7 +367,15 @@ class WatchControls(private val a: AppCompatActivity, private val playerView: St
         btnNext.alpha = if (nxt != null) 1f else 0.4f
         a.findViewById<View>(R.id.landNext).visibility = if (nxt != null) View.VISIBLE else View.INVISIBLE
         nxt?.thumb?.let { u -> a.findViewById<ImageView>(R.id.landNextThumb).load(u) }
+        updateRating()
         updatePlayButton(); updateTime()
+    }
+
+    /** Landscape 👍 / 👎 follow the local rating. */
+    fun updateRating() {
+        val r = host.rating()
+        a.findViewById<ImageView>(R.id.landLike).setColorFilter(rateColor(a, r == Likes.LIKE, android.R.color.white))
+        a.findViewById<ImageView>(R.id.landDislike).setColorFilter(rateColor(a, r == Likes.DISLIKE, android.R.color.white))
     }
 
     fun attach() {

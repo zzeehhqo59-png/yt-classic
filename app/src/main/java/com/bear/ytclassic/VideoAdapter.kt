@@ -30,18 +30,20 @@ fun ImageView.loadAvatar(url: String?) {
 class VideoAdapter(
     private val big: Boolean,
     private val onMore: ((View, VideoItem) -> Unit)? = null,
+    /** Playlists keep deleted / private videos (dimmed) even with "ซ่อนวิดีโอที่ดูไม่ได้" on. */
+    private val canHide: Boolean = true,
     private val onClick: (VideoItem) -> Unit,
 ) : RecyclerView.Adapter<RecyclerView.ViewHolder>() {
     val items = ArrayList<VideoItem>()
     /** Everything given to the adapter; [items] is this minus unplayable videos when that setting is on. */
     private val raw = ArrayList<VideoItem>()
-    private var hiding = Prefs.hideUnplayable
+    private var hiding = canHide && Prefs.hideUnplayable
     private fun visible(l: List<VideoItem>) = if (hiding) l.filter { it.unplayableBadge() == null } else l
     /** url -> watched fraction (0..1000), shown as a red bar on the thumbnail. */
     var progress: Map<String, Int> = emptyMap()
     fun refreshProgress() {
         progress = History.progressMap()
-        if (hiding != Prefs.hideUnplayable) { hiding = Prefs.hideUnplayable; items.clear(); items.addAll(visible(raw)); notifyDataSetChanged() }
+        if (hiding != (canHide && Prefs.hideUnplayable)) { hiding = canHide && Prefs.hideUnplayable; items.clear(); items.addAll(visible(raw)); notifyDataSetChanged() }
         else notifyItemRangeChanged(0, items.size)
     }
     var loadingMore = false
@@ -51,7 +53,7 @@ class VideoAdapter(
             if (v) notifyItemInserted(items.size) else notifyItemRemoved(items.size)
         }
 
-    fun set(list: List<VideoItem>) { hiding = Prefs.hideUnplayable; raw.clear(); raw.addAll(list); items.clear(); items.addAll(visible(list)); notifyDataSetChanged() }
+    fun set(list: List<VideoItem>) { hiding = canHide && Prefs.hideUnplayable; raw.clear(); raw.addAll(list); items.clear(); items.addAll(visible(list)); notifyDataSetChanged() }
     fun add(list: List<VideoItem>) { raw.addAll(list); val v = visible(list); val s = items.size; items.addAll(v); notifyItemRangeInserted(s, v.size) }
 
     override fun getItemCount() = items.size + if (loadingMore) 1 else 0
@@ -82,6 +84,8 @@ class VideoAdapter(
             val p = progress[it.url] ?: 0
             watched?.visibility = if (p > 0 && it.kind == 0) View.VISIBLE else View.GONE
             watched?.progress = p
+            // deleted / private videos stay in the list, dimmed
+            itemView.alpha = if (it.unavailable && it.kind == 0) 0.5f else 1f
             if (it.kind != 0) { bindOther(it); return }
             thumb.scaleType = ImageView.ScaleType.CENTER_CROP
             avatar?.visibility = View.VISIBLE
@@ -99,7 +103,7 @@ class VideoAdapter(
                 it.upcoming -> "รอเปิดตัว" + (it.scheduledEpochMs.takeIf { t -> t > 0 }?.let { t ->
                     " " + Fmt.thaiDateTime(java.time.OffsetDateTime.ofInstant(java.time.Instant.ofEpochMilli(t), java.time.ZoneId.systemDefault()))
                 } ?: "")
-                it.unavailable -> "วิดีโอส่วนตัวหรือถูกลบ"
+                it.unavailable -> ""
                 else -> badge.orEmpty()
             }
             if (channel != null) {

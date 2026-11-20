@@ -73,7 +73,7 @@ class SubsFragment : Fragment() {
         header.visible = subs.isNotEmpty()
         if (subs.isEmpty()) {
             videos.set(emptyList()); refresh.isRefreshing = false; progress.visibility = View.GONE
-            text.text = "ยังไม่ได้ติดตามช่องใด\n\nกด \"ติดตาม\" ในหน้าวิดีโอหรือหน้าช่อง\nหรือนำเข้าการติดตามจากไฟล์ในแท็บคลังวิดีโอ"
+            text.text = "ยังไม่ได้ติดตามช่องใด\n\nกด \"ติดตาม\" ในหน้าวิดีโอหรือหน้าช่อง\nหรือนำเข้าการติดตามจากไฟล์ในแท็บคุณ"
             retry.visibility = View.GONE; box.visibility = View.VISIBLE
             return
         }
@@ -137,7 +137,7 @@ class ChannelRowAdapter : RecyclerView.Adapter<ChannelRowAdapter.VH>() {
     }
 }
 
-/** คลังวิดีโอ tab: subscription count + import from file. */
+/** คุณ tab (เดิมคือคลังวิดีโอ): subscription count + import from file. */
 class LibraryFragment : Fragment() {
     private val picker = registerForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
         if (uri == null) return@registerForActivityResult
@@ -267,6 +267,8 @@ class LibraryFragment : Fragment() {
         pls.firstOrNull { it.id == Playlists.WATCH_LATER }?.let { wl ->
             row(top, R.drawable.ic_watch_later, wl.name, "${wl.count} วิดีโอ") { startActivity(VideoListActivity.local(ctx, wl.id)) }
         }
+        val likes = Likes.count()
+        row(top, R.drawable.ic_thumb_up, "วิดีโอที่ชอบ", if (likes > 0) "$likes วิดีโอ" else "ยังไม่มีวิดีโอที่ชอบ") { startActivity(VideoListActivity.liked(ctx)) }
         val box = view.findViewById<LinearLayout>(R.id.playlists); box.removeAllViews()
         row(box, R.drawable.ic_add, "สร้างเพลย์ลิสต์ใหม่", null) {
             ctx.askName("เพลย์ลิสต์ใหม่", "") { name -> Playlists.create(name); refreshCount() }

@@ -1,0 +1,22 @@
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android" xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent" android:layout_height="wrap_content" android:background="#202020">
+  <ImageView android:id="@+id/blur" android:layout_width="match_parent" android:layout_height="match_parent" android:scaleType="centerCrop" android:importantForAccessibility="no"/>
+  <View android:layout_width="match_parent" android:layout_height="match_parent" android:background="#8C000000"/>
+  <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="vertical" android:paddingStart="20dp" android:paddingEnd="20dp"
+      android:paddingTop="20dp" android:paddingBottom="20dp">
+    <ImageView android:id="@+id/cover" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginStart="24dp" android:layout_marginEnd="24dp"
+        android:scaleType="centerCrop" android:background="#33FFFFFF" android:importantForAccessibility="no"/>
+    <TextView android:id="@+id/plTitle" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="16dp" android:maxLines="2" android:ellipsize="end"
+        android:textColor="#FFFFFF" android:textSize="22sp" android:textStyle="bold"/>
+    <TextView android:id="@+id/plOwner" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="6dp" android:maxLines="1" android:ellipsize="end"
+        android:textColor="#FFFFFF" android:textSize="13sp" android:textStyle="bold" android:visibility="gone"/>
+    <TextView android:id="@+id/plCount" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="4dp"
+        android:textColor="#CCFFFFFF" android:textSize="13sp"/>
+    <LinearLayout android:id="@+id/btnPlayAll" android:layout_width="match_parent" android:layout_height="40dp" android:layout_marginTop="16dp" android:orientation="horizontal"
+        android:gravity="center" android:background="@drawable/bg_play_all" android:foreground="?attr/selectableItemBackground" android:clickable="true" android:focusable="true">
+      <ImageView android:layout_width="22dp" android:layout_height="22dp" android:src="@drawable/ic_play" app:tint="#0F0F0F" android:importantForAccessibility="no"/>
+      <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginStart="6dp" android:text="เล่นทั้งหมด"
+          android:textColor="#0F0F0F" android:textSize="14sp" android:textStyle="bold"/>
+    </LinearLayout>
+  </LinearLayout>
+</FrameLayout>

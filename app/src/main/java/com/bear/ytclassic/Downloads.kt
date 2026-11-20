@@ -192,7 +192,7 @@ object Downloads {
             fun go(o: Option) {
                 val id = add(item, o.audio, o.height)
                 DownloadService.send(c, DownloadService.ACTION_START, id)
-                Toast.makeText(c, "เริ่มดาวน์โหลดแล้ว ดูได้ที่ คลังวิดีโอ > การดาวน์โหลด", Toast.LENGTH_SHORT).show()
+                Toast.makeText(c, "เริ่มดาวน์โหลดแล้ว ดูได้ที่ แท็บคุณ > การดาวน์โหลด", Toast.LENGTH_SHORT).show()
             }
             if (!Prefs.dlAsk) { go(opts[def]); return@launch }
             var choice = def
