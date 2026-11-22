@@ -8,12 +8,19 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
+import org.schabi.newpipe.extractor.ServiceList
+import org.schabi.newpipe.extractor.channel.tabs.ChannelTabs
+import org.schabi.newpipe.extractor.linkhandler.ListLinkHandler
 
 data class ChannelUiState(
     val channel: Channel? = null,
     val banner: String? = null,
-    val description: String = "",
-    val videos: List<VideoItem> = emptyList(),
+    val tabs: List<ChannelTabSpec> = emptyList(),
+    val selectedTab: String = ChannelPage.HOME,
+    val featured: VideoItem? = null,
+    val items: List<VideoItem> = emptyList(),
+    val about: ChannelAbout? = null,
+    val sortOptions: List<Pair<String, String>> = emptyList(),
     val loading: Boolean = false,
     val loadingMore: Boolean = false,
     val hasMore: Boolean = false,
@@ -25,11 +32,18 @@ class ChannelViewModel : ViewModel() {
     private val _ui = MutableStateFlow(ChannelUiState())
     val ui: StateFlow<ChannelUiState> = _ui
     private var url = ""
-    private var pager: Pager? = null
+    private var handlers = emptyMap<String, ListLinkHandler>()
+    private val pagers = HashMap<String, Pager>()
+    private val cache = HashMap<String, List<VideoItem>>()
+    private var featuredCache: VideoItem? = null
     private var job: Job? = null
 
     fun load(url: String, name: String, avatar: String?) {
         this.url = url
+        handlers = emptyMap()
+        pagers.clear()
+        cache.clear()
+        featuredCache = null
         _ui.value = ChannelUiState(channel = Channel(url, name, avatar), loading = true)
         job?.cancel()
         job = viewModelScope.launch {
@@ -37,17 +51,27 @@ class ChannelViewModel : ViewModel() {
                 val info = Repo.channel(url)
                 val ch = Channel(url, info.name, info.avatars.pick(176) ?: avatar, info.subscriberCount)
                 if (Subs.isSubscribed(url)) Subs.update(ch)
-                val p = Repo.channelVideos(url)
-                pager = p
-                val videos = p.next()
+                handlers = info.tabs.mapNotNull { h -> h.contentFilters.firstOrNull()?.let { it to h } }.toMap()
+                val tabs = ChannelPage.visibleTabs(handlers.keys.toList())
+                val about = ChannelAbout(
+                    description = info.description.orEmpty().trim(),
+                    subscriberCount = info.subscriberCount,
+                    links = ChannelPage.linksFrom(info.description.orEmpty(), info.donationLinks?.toList().orEmpty()),
+                )
+                val sortOptions = ChannelPage.sortOptions(
+                    runCatching { ServiceList.YouTube.channelTabLHFactory.availableSortFilter.toList() }
+                        .getOrDefault(emptyList()),
+                )
                 _ui.value = ChannelUiState(
                     channel = ch,
                     banner = info.banners.pick(400),
-                    description = info.description.orEmpty().trim(),
-                    videos = videos,
-                    hasMore = p.hasMore,
-                    emptyMessage = if (videos.isEmpty()) "ช่องนี้ยังไม่มีวิดีโอ" else null,
+                    tabs = tabs,
+                    selectedTab = tabs.firstOrNull()?.id ?: ChannelPage.HOME,
+                    about = about,
+                    sortOptions = sortOptions,
+                    loading = true,
                 )
+                fetchTab(_ui.value.selectedTab)
             } catch (e: CancellationException) { throw e
             } catch (e: Throwable) {
                 Log.w("Channel", "load failed", e)
@@ -59,20 +83,101 @@ class ChannelViewModel : ViewModel() {
         }
     }
 
+    fun selectTab(id: String) {
+        if (id == _ui.value.selectedTab && !(_ui.value.loading && _ui.value.items.isEmpty() && _ui.value.featured == null)) return
+        job?.cancel()
+        job = viewModelScope.launch {
+            try { fetchTab(id) }
+            catch (e: CancellationException) { throw e }
+            catch (e: Throwable) {
+                Log.w("Channel", "tab $id failed", e)
+                _ui.value = _ui.value.copy(loading = false, selectedTab = id, error = Errors.list(e).replace("รายการวิดีโอ", "ช่องนี้"))
+            }
+        }
+    }
+
+    private suspend fun fetchTab(id: String) {
+        cache[id]?.let { cached ->
+            val p = pagers[id]
+            _ui.value = _ui.value.copy(
+                selectedTab = id,
+                featured = if (id == ChannelPage.HOME) featuredCache else null,
+                items = cached,
+                loading = false,
+                loadingMore = false,
+                hasMore = p?.hasMore == true,
+                error = null,
+                emptyMessage = if (cached.isEmpty() && (id != ChannelPage.HOME || featuredCache == null)) emptyText(id) else null,
+            )
+            return
+        }
+        _ui.value = _ui.value.copy(selectedTab = id, loading = true, error = null, emptyMessage = null, items = emptyList(), featured = null, hasMore = false)
+        if (id == ChannelPage.HOME) {
+            val src = homeSource()
+            if (src == null) {
+                _ui.value = _ui.value.copy(loading = false, emptyMessage = emptyText(id))
+                return
+            }
+            val p = pagerFor(src)
+            val items = p.next()
+            val featured = items.firstOrNull { PlayQueue.isPlayable(it) } ?: items.firstOrNull()
+            featuredCache = featured
+            val rest = items.filter { it.url != featured?.url }
+            cache[id] = rest
+            pagers[id] = p
+            _ui.value = _ui.value.copy(
+                featured = featured, items = rest, loading = false, hasMore = p.hasMore,
+                emptyMessage = if (featured == null && rest.isEmpty()) emptyText(id) else null,
+            )
+        } else {
+            val p = pagerFor(id)
+            val items = p.next()
+            cache[id] = items
+            pagers[id] = p
+            _ui.value = _ui.value.copy(
+                featured = null, items = items, loading = false, hasMore = p.hasMore,
+                emptyMessage = if (items.isEmpty()) emptyText(id) else null,
+            )
+        }
+    }
+
     fun loadMore() {
-        val p = pager ?: return
+        val id = _ui.value.selectedTab
+        val p = pagers[id] ?: return
         val st = _ui.value
         if (job?.isActive == true || !p.hasMore || st.loading) return
         job = viewModelScope.launch {
             _ui.value = st.copy(loadingMore = true)
             try {
                 val more = p.next()
-                _ui.value = _ui.value.copy(videos = _ui.value.videos + more, loadingMore = false, hasMore = p.hasMore)
+                val all = (_ui.value.items + more)
+                cache[id] = all
+                _ui.value = _ui.value.copy(items = all, loadingMore = false, hasMore = p.hasMore)
             } catch (e: CancellationException) { throw e
             } catch (e: Throwable) {
                 Log.w("Channel", "next page failed", e)
                 _ui.value = _ui.value.copy(loadingMore = false)
             }
         }
+    }
+
+    private fun homeSource(): String? = when {
+        ChannelTabs.VIDEOS in handlers -> ChannelTabs.VIDEOS
+        ChannelTabs.LIVESTREAMS in handlers -> ChannelTabs.LIVESTREAMS
+        ChannelTabs.SHORTS in handlers -> ChannelTabs.SHORTS
+        else -> null
+    }
+
+    private fun pagerFor(id: String): Pager {
+        val h = handlers[id]
+        return if (h != null) Repo.channelTab(h) else Repo.channelTab(url, id)
+    }
+
+    private fun emptyText(id: String) = when (id) {
+        ChannelTabs.SHORTS -> "ช่องนี้ยังไม่มี Shorts"
+        ChannelTabs.PLAYLISTS -> "ช่องนี้ยังไม่มีเพลย์ลิสต์"
+        ChannelTabs.LIVESTREAMS -> "ช่องนี้ยังไม่มีไลฟ์สด"
+        ChannelTabs.PODCASTS -> "ช่องนี้ยังไม่มีพอดแคสต์"
+        else -> "ช่องนี้ยังไม่มีวิดีโอ"
     }
 }

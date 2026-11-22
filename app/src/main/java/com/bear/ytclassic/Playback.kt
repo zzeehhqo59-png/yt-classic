@@ -228,13 +228,14 @@ object Playback {
             try {
                 val info = Repo.stream(item.url)
                 live = info.streamType == StreamType.LIVE_STREAM || info.streamType == StreamType.AUDIO_LIVE_STREAM
+                val short = item.shortForm || info.isShortFormContent || item.url.contains("/shorts/")
                 val full = item.copy(
                     title = info.name.ifBlank { item.title }, channel = info.uploaderName ?: item.channel,
                     channelUrl = info.uploaderUrl ?: item.channelUrl, avatar = info.uploaderAvatars.pick(88) ?: item.avatar,
                     thumb = item.thumb ?: info.thumbnails.pick(360), durationSec = if (info.duration > 0) info.duration else item.durationSec,
-                    live = live,
+                    live = live, shortForm = short,
                 )
-                withContext(Dispatchers.IO) { History.updateMeta(item.url, full.channelUrl, full.avatar, full.durationSec, full.title) }
+                withContext(Dispatchers.IO) { History.updateMeta(item.url, full.channelUrl, full.avatar, full.durationSec, full.title, shortForm = short) }
                 qualities = buildQualities(info)
                 // the extractor now lists only TTML links; YouTube serves the same captions as WebVTT with fmt=vtt
                 subtitles = info.subtitles.filter { it.isUrl && (it.format == MediaFormat.VTT || (it.format == MediaFormat.TTML && it.content.contains("fmt=ttml"))) }
@@ -346,45 +347,6 @@ object Playback {
         player.trackSelectionParameters = player.trackSelectionParameters.buildUpon().setTrackTypeDisabled(C.TRACK_TYPE_VIDEO, !visible).build()
     }
 
-    /**
-     * "อัตโนมัติ": one DASH manifest holding every H.264 video height + the best AAC audio,
-     * so ExoPlayer picks (and switches) the height by measured bandwidth.
-     */
-    private fun adaptive(info: StreamInfo, videoOnly: List<VideoStream>, audios: List<AudioStream>): Quality? {
-        val durS = info.duration.takeIf { it > 0 } ?: return null
-        fun indexed(s: org.schabi.newpipe.extractor.stream.Stream) = s.itagItem?.let { it.initEnd > 0 && it.indexEnd > it.indexStart && it.indexStart > 0 } == true
-        val vids = videoOnly.filter { it.format == MediaFormat.MPEG_4 && (it.codec ?: "").startsWith("avc") && indexed(it) && it.height <= 1080 }
-            .groupBy { it.height }.map { (_, l) -> l.maxBy { v -> v.itagItem!!.bitrate } }.sortedBy { it.height }
-        if (vids.size < 2) return null
-        val a = audios.filter { it.format == MediaFormat.M4A && indexed(it) }.maxByOrNull { it.itagItem!!.bitrate } ?: return null
-        fun esc(u: String) = u.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;").replace("\"", "&quot;")
-        fun rep(id: String, s: org.schabi.newpipe.extractor.stream.Stream, attrs: String): String {
-            val it = s.itagItem!!
-            return "<Representation id=\"$id\" bandwidth=\"${it.bitrate.coerceAtLeast(1)}\" codecs=\"${esc(it.codec ?: "")}\" $attrs>" +
-                "<BaseURL>${esc(s.content)}</BaseURL><SegmentBase indexRange=\"${it.indexStart}-${it.indexEnd}\">" +
-                "<Initialization range=\"${it.initStart}-${it.initEnd}\"/></SegmentBase></Representation>"
-        }
-        val mpd = buildString {
-            append("<?xml version=\"1.0\" encoding=\"UTF-8\"?><MPD xmlns=\"urn:mpeg:dash:schema:mpd:2011\" profiles=\"urn:mpeg:dash:profile:isoff-on-demand:2011\" ")
-            append("type=\"static\" minBufferTime=\"PT1.500S\" mediaPresentationDuration=\"PT${durS}S\"><Period>")
-            append("<AdaptationSet id=\"0\" contentType=\"video\" mimeType=\"video/mp4\" subsegmentAlignment=\"true\">")
-            vids.forEachIndexed { i, v -> append(rep("v$i", v, "width=\"${v.width}\" height=\"${v.height}\"" + if (v.fps > 0) " frameRate=\"${v.fps}\"" else "")) }
-            append("</AdaptationSet><AdaptationSet id=\"1\" contentType=\"audio\" mimeType=\"audio/mp4\" subsegmentAlignment=\"true\">")
-            append(rep("a0", a, "audioSamplingRate=\"44100\""))
-            append("</AdaptationSet></Period></MPD>")
-        }
-        val manifest = DashManifestParser().parse(android.net.Uri.parse(info.url), java.io.ByteArrayInputStream(mpd.toByteArray()))
-        return Quality("อัตโนมัติ", AUTO) {
-            DashMediaSource.Factory(dsFactory).createMediaSource(manifest,
-                MediaItem.Builder().setUri(info.url).setMimeType(MimeTypes.APPLICATION_MPD).build())
-        }
-    }
-
-    private fun bestAudio(audios: List<AudioStream>, forWebm: Boolean): AudioStream? {
-        val pref = audios.filter { if (forWebm) it.format == MediaFormat.WEBMA || it.format == MediaFormat.WEBMA_OPUS else it.format == MediaFormat.M4A }
-        return (pref.ifEmpty { audios }).maxByOrNull { if (it.averageBitrate > 0) it.averageBitrate else it.bitrate }
-    }
-
     fun setAudioTrack(id: String) {
         val track = audioTracks.firstOrNull { it.id == id } ?: return
         if (track.id == currentAudio?.id) return
@@ -401,43 +363,9 @@ object Playback {
     }
 
     private fun buildQualities(info: StreamInfo): List<Quality> {
-        val live = info.streamType == StreamType.LIVE_STREAM || info.streamType == StreamType.AUDIO_LIVE_STREAM
-        val hls = info.hlsUrl.orEmpty()
-        val dash = info.dashMpdUrl.orEmpty()
-        val out = ArrayList<Quality>()
-        if (live || (info.videoStreams.isEmpty() && info.videoOnlyStreams.isEmpty())) {
-            if (hls.isNotEmpty()) out.add(Quality("อัตโนมัติ", 0) { HlsMediaSource.Factory(dsFactory).createMediaSource(MediaItem.fromUri(hls)) })
-            else if (dash.isNotEmpty()) out.add(Quality("อัตโนมัติ", 0) { DashMediaSource.Factory(dsFactory).createMediaSource(MediaItem.fromUri(dash)) })
-            if (live) return out
-        }
-        val prog = ProgressiveMediaSource.Factory(dsFactory)
-        fun ok(s: org.schabi.newpipe.extractor.stream.Stream) = s.isUrl && s.deliveryMethod == DeliveryMethod.PROGRESSIVE_HTTP
-        val allAudio = info.audioStreams.filter { ok(it) }
-        audioTracks = AudioTracks.groupStreams(allAudio)
-        if (currentAudio == null || audioTracks.none { it.id == currentAudio?.id }) {
-            currentAudio = AudioTracks.pick(audioTracks, Prefs.audioLanguage)
-        }
-        val audios = AudioTracks.filter(allAudio, currentAudio).ifEmpty { allAudio }
-        val byHeight = LinkedHashMap<Int, Quality>()
-        val videoOnly = info.videoOnlyStreams.filter { ok(it) && it.height > 0 }
-        if (audios.isNotEmpty()) {
-            videoOnly.groupBy { it.height }.forEach { (h, list) ->
-                val v: VideoStream = list.firstOrNull { it.format == MediaFormat.MPEG_4 && (it.codec ?: "").startsWith("avc") }
-                    ?: list.firstOrNull { it.format == MediaFormat.MPEG_4 } ?: list.first()
-                val a = bestAudio(audios, v.format == MediaFormat.WEBM) ?: return@forEach
-                val label = "${h}p" + if (v.fps > 30) "${v.fps}" else ""
-                byHeight[h] = Quality(label, h) {
-                    MergingMediaSource(true, prog.createMediaSource(MediaItem.fromUri(v.content)), prog.createMediaSource(MediaItem.fromUri(a.content)))
-                }
-            }
-        }
-        info.videoStreams.filter { ok(it) }.forEach { v ->
-            val h = v.height.takeIf { it > 0 } ?: v.resolution.filter { c -> c.isDigit() }.take(4).toIntOrNull() ?: 0
-            if (!byHeight.containsKey(h)) byHeight[h] = Quality(if (h > 0) "${h}p" else v.resolution, h) { prog.createMediaSource(MediaItem.fromUri(v.content)) }
-        }
-        out.addAll(byHeight.values.sortedBy { it.height })
-        if (audios.isNotEmpty()) runCatching { adaptive(info, videoOnly, audios) }.getOrNull()?.let { out.add(it) }
-        if (out.isEmpty() && hls.isNotEmpty()) out.add(Quality("อัตโนมัติ", 0) { HlsMediaSource.Factory(dsFactory).createMediaSource(MediaItem.fromUri(hls)) })
-        return out
+        val r = StreamSources.build(info, dsFactory, currentAudio, Prefs.audioLanguage)
+        audioTracks = r.audioTracks
+        currentAudio = r.currentAudio
+        return r.qualities
     }
 }

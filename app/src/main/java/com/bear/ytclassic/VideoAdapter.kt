@@ -21,6 +21,13 @@ class RatioImageView @JvmOverloads constructor(c: Context, a: AttributeSet? = nu
     }
 }
 
+class ShortsImageView @JvmOverloads constructor(c: Context, a: AttributeSet? = null) : AppCompatImageView(c, a) {
+    override fun onMeasure(w: Int, h: Int) {
+        val width = MeasureSpec.getSize(w)
+        setMeasuredDimension(width, width * 16 / 9)
+    }
+}
+
 fun ImageView.loadAvatar(url: String?) {
     if (url.isNullOrBlank()) { setImageDrawable(null); return }
     load(url) { transformations(CircleCropTransformation()) }
@@ -113,6 +120,12 @@ class VideoAdapter(
                 meta.text = listOf(it.channel, views, Fmt.ageMs(it.uploadedMs, it.age).takeUnless { _ -> it.live || it.upcoming }.orEmpty(), extra).filter { s -> s.isNotBlank() }.joinToString(" · ")
             }
             avatar?.loadAvatar(it.avatar)
+            val openCh = View.OnClickListener { _ ->
+                val url = VideoClicks.channelUrl(it) ?: return@OnClickListener
+                itemView.context.openChannel(url, it.channel, it.avatar)
+            }
+            avatar?.apply { isClickable = true; isFocusable = true; setOnClickListener(openCh); contentDescription = "ช่อง" }
+            channel?.apply { isClickable = true; isFocusable = true; setOnClickListener(openCh) }
             itemView.setOnClickListener { _ -> onClick(it) }
         }
 

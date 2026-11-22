@@ -43,6 +43,8 @@ data class VideoItem(
     val unavailable: Boolean = false,
     /** With [unavailable]: the video is private (otherwise deleted / removed). */
     val privateVideo: Boolean = false,
+    /** Short-form clip, from the extractor or a /shorts/ URL. */
+    val shortForm: Boolean = false,
 ) : Serializable
 
 /** Thai badge for a list item that can't be watched here (null = playable as far as the list tells). */
@@ -79,6 +81,7 @@ fun StreamInfoItem.toVideo(): VideoItem {
         privateVideo = Availability.kindFromTitle(name) == Availability.PRIVATE,
         scheduledEpochMs = if (upcoming) uploadDate?.instant?.toEpochMilli() ?: 0 else 0,
         uploadedMs = uploadDate?.instant?.toEpochMilli() ?: 0,
+        shortForm = isShort(),
     )
 }
 
@@ -132,6 +135,21 @@ private class HomePager(private val pagers: List<Pager>) : Pager {
     }
 }
 
+fun List<InfoItem>.tabItems(includeShorts: Boolean, onlyShorts: Boolean = false): List<VideoItem> = mapNotNull { i ->
+    when (i) {
+        is StreamInfoItem -> {
+            val v = i.toVideo()
+            when {
+                onlyShorts && !v.isShortClip() -> null
+                !includeShorts && v.isShortClip() -> null
+                else -> v
+            }
+        }
+        is ChannelInfoItem, is PlaylistInfoItem -> i.let { listOf(it).toItems().firstOrNull() }
+        else -> null
+    }
+}
+
 object Repo {
     private val yt get() = ServiceList.YouTube
 
@@ -178,6 +196,28 @@ object Repo {
     private fun withIdTab(url: String): ListPager {
         val id = yt.channelLHFactory.fromUrl(url).id
         return ListPager(yt.getChannelTabExtractorFromId(id, ChannelTabs.VIDEOS))
+    }
+
+    fun channelTab(handler: org.schabi.newpipe.extractor.linkhandler.ListLinkHandler): ListPager {
+        val tab = handler.contentFilters.firstOrNull().orEmpty()
+        val extractor = yt.getChannelTabExtractor(handler)
+        return when (tab) {
+            ChannelTabs.SHORTS -> ListPager(extractor) { it.tabItems(includeShorts = true, onlyShorts = true) }
+            ChannelTabs.PLAYLISTS, ChannelTabs.PODCASTS, ChannelTabs.ALBUMS, ChannelTabs.COURSES ->
+                ListPager(extractor) { it.toItems() }
+            else -> ListPager(extractor) { it.tabItems(includeShorts = tab != ChannelTabs.VIDEOS && tab != ChannelTabs.LIVESTREAMS) }
+        }
+    }
+
+    fun channelTab(url: String, tabId: String): ListPager {
+        val id = yt.channelLHFactory.fromUrl(url).id
+        val extractor = yt.getChannelTabExtractorFromId(id, tabId)
+        return when (tabId) {
+            ChannelTabs.SHORTS -> ListPager(extractor) { it.tabItems(includeShorts = true, onlyShorts = true) }
+            ChannelTabs.PLAYLISTS, ChannelTabs.PODCASTS, ChannelTabs.ALBUMS, ChannelTabs.COURSES ->
+                ListPager(extractor) { it.toItems() }
+            else -> ListPager(extractor) { it.tabItems(includeShorts = false) }
+        }
     }
 
     suspend fun stream(url: String): StreamInfo = withContext(Dispatchers.IO) {

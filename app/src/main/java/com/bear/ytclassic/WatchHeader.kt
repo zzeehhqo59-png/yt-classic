@@ -20,6 +20,7 @@ class WatchHeaderAdapter(private val a: AppCompatActivity, private val cb: Callb
         fun openComments()
         fun moreSheet()
         fun share()
+        fun save()
         /** Local rating of the current video: 1 ถูกใจ, -1 ไม่ชอบ, 0 none. */
         fun rating(): Int
         fun rate(value: Int)
@@ -80,9 +81,12 @@ class WatchHeaderAdapter(private val a: AppCompatActivity, private val cb: Callb
         sp.setSpan(android.text.style.ForegroundColorSpan(androidx.core.content.ContextCompat.getColor(a, R.color.text1)), st, sp.length, android.text.Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
         v.findViewById<TextView>(R.id.wMeta).text = sp
         v.findViewById<View>(R.id.titleRow).setOnClickListener { a.descriptionSheet(title, stats.ifEmpty { meta }, desc) }
-        v.findViewById<ImageView>(R.id.wAvatar).apply { loadAvatar(avatar); setOnClickListener { a.openChannel(channelUrl, channel, avatar) } }
+        v.findViewById<ImageView>(R.id.wAvatar).loadAvatar(avatar)
+        v.findViewById<TextView>(R.id.wChannelName).text = channel
+        v.findViewById<View>(R.id.channelIdentity).setOnClickListener { a.openChannel(channelUrl, channel, avatar) }
         v.findViewById<TextView>(R.id.likeCount).apply { text = likes; visibility = if (likes.isEmpty()) View.GONE else View.VISIBLE }
         v.findViewById<View>(R.id.btnShare).setOnClickListener { cb.share() }
+        v.findViewById<View>(R.id.btnSave).setOnClickListener { cb.save() }
         v.findViewById<View>(R.id.btnMore).setOnClickListener { cb.moreSheet() }
         val cRow = v.findViewById<View>(R.id.commentsRow)
         cRow.visibility = if (cTitle == null) View.GONE else View.VISIBLE

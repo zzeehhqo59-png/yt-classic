@@ -1,0 +1,12 @@
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android" android:layout_width="140dp" android:layout_height="wrap_content"
+    android:orientation="vertical" android:padding="6dp" android:background="?attr/selectableItemBackground">
+  <FrameLayout android:layout_width="match_parent" android:layout_height="78dp">
+    <ImageView android:id="@+id/thumb" android:layout_width="match_parent" android:layout_height="match_parent"
+        android:scaleType="centerCrop" android:background="@color/placeholder" android:importantForAccessibility="no"/>
+    <TextView android:id="@+id/duration" android:layout_width="wrap_content" android:layout_height="wrap_content"
+        android:layout_gravity="bottom|end" android:layout_margin="4dp" android:background="@drawable/bg_duration"
+        android:paddingStart="4dp" android:paddingEnd="4dp" android:textColor="#FFFFFF" android:textSize="10sp" android:textStyle="bold"/>
+  </FrameLayout>
+  <TextView android:id="@+id/title" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="4dp"
+      android:maxLines="2" android:ellipsize="end" android:textColor="@color/text1" android:textSize="12sp"/>
+</LinearLayout>

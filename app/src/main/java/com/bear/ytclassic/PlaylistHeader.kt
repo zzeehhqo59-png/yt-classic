@@ -16,8 +16,11 @@ import coil3.size.Size
 import coil3.transform.Transformation
 
 /** Top of a playlist page: blurred cover behind the cover image, title, owner, "N วิดีโอ" and "เล่นทั้งหมด". */
-class PlaylistHeaderAdapter(private val onPlayAll: () -> Unit) : RecyclerView.Adapter<RecyclerView.ViewHolder>() {
-    data class Info(val title: String, val owner: String?, val count: Int, val cover: String?, val canPlay: Boolean)
+class PlaylistHeaderAdapter(
+        private val onPlayAll: () -> Unit,
+        private val onFilter: ((Int) -> Unit)? = null,
+) : RecyclerView.Adapter<RecyclerView.ViewHolder>() {
+    data class Info(val title: String, val owner: String?, val count: Int, val cover: String?, val canPlay: Boolean, val showFilter: Boolean = false, val filter: Int = PlaylistFilter.ALL)
 
     private var info: Info? = null
 
@@ -55,6 +58,26 @@ class PlaylistHeaderAdapter(private val onPlayAll: () -> Unit) : RecyclerView.Ad
         v.findViewById<View>(R.id.btnPlayAll).apply {
             alpha = if (i.canPlay) 1f else 0.5f
             setOnClickListener { onPlayAll() }
+        }
+        val chips = v.findViewById<com.google.android.material.chip.ChipGroup>(R.id.filters)
+        if (!i.showFilter || onFilter == null) chips.visibility = android.view.View.GONE
+        else {
+            chips.visibility = android.view.View.VISIBLE
+            if (chips.childCount == 0) {
+                PlaylistFilter.chips.forEach { (id, label) ->
+                    val chip = com.google.android.material.chip.Chip(chips.context).apply {
+                        text = label; isCheckable = true; tag = id
+                        chipBackgroundColor = androidx.core.content.ContextCompat.getColorStateList(context, R.color.chip_bg_state)
+                        setTextColor(androidx.core.content.ContextCompat.getColorStateList(context, R.color.chip_text_state))
+                        setOnClickListener { onFilter.invoke(id) }
+                    }
+                    chips.addView(chip)
+                }
+            }
+            for (n in 0 until chips.childCount) {
+                val chip = chips.getChildAt(n) as com.google.android.material.chip.Chip
+                chip.isChecked = chip.tag == i.filter
+            }
         }
     }
 }

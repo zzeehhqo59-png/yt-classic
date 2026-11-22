@@ -18,13 +18,20 @@ object Db {
     private const val VDEF = "url TEXT NOT NULL, title TEXT, channel TEXT, channel_url TEXT, thumb TEXT, avatar TEXT, duration INTEGER, views INTEGER, uploaded_ms INTEGER"
 
     fun init(c: Context) {
-        helper = object : SQLiteOpenHelper(c.applicationContext, "ytclassic.db", null, 5) {
+        helper = object : SQLiteOpenHelper(c.applicationContext, "ytclassic.db", null, 6) {
             override fun onCreate(db: SQLiteDatabase) {
                 db.execSQL("CREATE TABLE subs (url TEXT PRIMARY KEY, name TEXT NOT NULL, avatar TEXT, subscribers INTEGER NOT NULL DEFAULT -1, added INTEGER NOT NULL)")
-                createV2(db); createV3(db); createV4(db)
+                createV2(db); createV3(db); createV4(db); createV6(db)
             }
-            override fun onUpgrade(db: SQLiteDatabase, o: Int, n: Int) { if (o < 2) createV2(db); if (o < 3) createV3(db); if (o < 4) createV4(db); if (o in 2..4) rekeyHistory(db) }
+            override fun onUpgrade(db: SQLiteDatabase, o: Int, n: Int) { if (o < 2) createV2(db); if (o < 3) createV3(db); if (o < 4) createV4(db); if (o in 2..4) rekeyHistory(db); if (o < 6) createV6(db) }
         }
+    }
+
+    /** 6.0.1: remember which saved videos are Shorts. ALTER only, existing rows stay. */
+    fun addShortFormColumnSql(table: String) = "ALTER TABLE $table ADD COLUMN short_form INTEGER NOT NULL DEFAULT 0"
+
+    private fun createV6(db: SQLiteDatabase) {
+        listOf("history", "likes", "playlist_items").forEach { db.execSQL(addShortFormColumnSql(it)) }
     }
 
     /** 5.0: local likes and remembered deleted / private videos. */
@@ -65,14 +72,20 @@ object Db {
     fun values(v: VideoItem) = ContentValues().apply {
         put("url", v.url); put("title", v.title); put("channel", v.channel); put("channel_url", v.channelUrl)
         put("thumb", v.thumb); put("avatar", v.avatar); put("duration", v.durationSec); put("views", v.views); put("uploaded_ms", v.uploadedMs)
+        if (v.shortForm) put("short_form", 1)
     }
 
-    /** Reads the first 9 columns in [VCOLS] order. */
-    fun video(c: Cursor) = VideoItem(
-        url = c.getString(0), title = c.getString(1).orEmpty(), channel = c.getString(2).orEmpty(), channelUrl = c.getString(3),
-        thumb = c.getString(4), avatar = c.getString(5), durationSec = c.getLong(6), views = c.getLong(7), age = "",
-        live = false, upcoming = false, members = false, scheduledEpochMs = 0, uploadedMs = c.getLong(8),
-    )
+    /** Reads the first 9 columns in [VCOLS] order, plus optional short_form if the cursor selected it. */
+    fun video(c: Cursor): VideoItem {
+        val item = VideoItem(
+            url = c.getString(0), title = c.getString(1).orEmpty(), channel = c.getString(2).orEmpty(), channelUrl = c.getString(3),
+            thumb = c.getString(4), avatar = c.getString(5), durationSec = c.getLong(6), views = c.getLong(7), age = "",
+            live = false, upcoming = false, members = false, scheduledEpochMs = 0, uploadedMs = c.getLong(8),
+        )
+        val idx = c.getColumnIndex("short_form")
+        val flagged = idx >= 0 && !c.isNull(idx) && c.getInt(idx) == 1
+        return if (flagged || item.isShortClip()) item.copy(shortForm = true) else item
+    }
 }
 
 object History {
@@ -89,10 +102,11 @@ object History {
     }
 
     /** Fill in channel url / avatar / duration once the stream info is known. */
-    fun updateMeta(url: String, channelUrl: String?, avatar: String?, durationSec: Long, title: String) {
+    fun updateMeta(url: String, channelUrl: String?, avatar: String?, durationSec: Long, title: String, shortForm: Boolean = false) {
         val cv = ContentValues().apply {
             channelUrl?.let { put("channel_url", it) }; avatar?.let { put("avatar", it) }
             if (durationSec > 0) put("duration", durationSec); if (title.isNotBlank()) put("title", title)
+            if (shortForm) put("short_form", 1)
         }
         if (cv.size() > 0) Db.w.update("history", cv, "url=?", arrayOf(url))
     }
@@ -111,7 +125,7 @@ object History {
     data class Entry(val video: VideoItem, val watchedAt: Long, val count: Int)
 
     fun recent(limit: Int = 500): List<Entry> =
-        Db.r.rawQuery("SELECT ${Db.VCOLS}, watched_at, watch_count FROM history ORDER BY watched_at DESC LIMIT $limit", null).use { c ->
+        Db.r.rawQuery("SELECT ${Db.VCOLS}, watched_at, watch_count, short_form FROM history ORDER BY watched_at DESC LIMIT $limit", null).use { c ->
             buildList { while (c.moveToNext()) add(Entry(Db.video(c), c.getLong(9), c.getInt(10))) }
         }
 
@@ -151,7 +165,7 @@ object Playlists {
         Db.w.insertWithOnConflict("playlist_items", null, Db.values(v).apply { put("playlist_id", id); put("added", System.currentTimeMillis()) }, SQLiteDatabase.CONFLICT_IGNORE) != -1L
     fun remove(id: Long, url: String) { Db.w.delete("playlist_items", "playlist_id=? AND url=?", arrayOf("$id", url)) }
     fun clear(id: Long) { Db.w.delete("playlist_items", "playlist_id=?", arrayOf("$id")) }
-    fun items(id: Long): List<VideoItem> = Db.r.rawQuery("SELECT ${Db.VCOLS} FROM playlist_items WHERE playlist_id=? ORDER BY added ${if (id == WATCH_LATER) "DESC" else "ASC"}", arrayOf("$id"))
+    fun items(id: Long): List<VideoItem> = Db.r.rawQuery("SELECT ${Db.VCOLS}, short_form FROM playlist_items WHERE playlist_id=? ORDER BY added ${if (id == WATCH_LATER) "DESC" else "ASC"}", arrayOf("$id"))
         .use { c -> buildList { while (c.moveToNext()) add(Db.video(c)) } }
 }
 

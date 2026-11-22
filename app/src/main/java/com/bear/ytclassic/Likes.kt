@@ -32,7 +32,7 @@ object Likes {
         else -> "ยกเลิกการไม่ชอบแล้ว"
     }
 
-    fun liked(): List<VideoItem> = Db.r.rawQuery("SELECT ${Db.VCOLS} FROM likes WHERE value=1 ORDER BY at DESC", null).use { c ->
+    fun liked(): List<VideoItem> = Db.r.rawQuery("SELECT ${Db.VCOLS}, short_form FROM likes WHERE value=1 ORDER BY at DESC", null).use { c ->
         buildList { while (c.moveToNext()) add(Db.video(c)) }
     }
 

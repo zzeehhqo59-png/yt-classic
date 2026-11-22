@@ -56,6 +56,7 @@ class WatchActivity : AppCompatActivity() {
         override fun openComments() = this@WatchActivity.openComments()
         override fun moreSheet() { this@WatchActivity.moreSheet() }
         override fun share() = shareUrl(item.url)
+        override fun save() { saveToPlaylist(item) }
         override fun rating() = Likes.state(item.url)
         override fun rate(value: Int) = this@WatchActivity.rate(value)
         override fun onComments(title: String?, preview: String?, avatar: String?) = ctl.updateLandComments(title, preview, avatar)

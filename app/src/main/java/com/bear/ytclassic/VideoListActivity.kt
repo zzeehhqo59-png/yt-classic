@@ -31,7 +31,9 @@ class VideoListActivity : AppCompatActivity() {
     private lateinit var mode: String
     private var plId = 0L
     private lateinit var adapter: VideoAdapter
-    private val header = PlaylistHeaderAdapter { playFrom(0) }
+    private val header = PlaylistHeaderAdapter({ playFrom(0) }, { setFilter(it) })
+    private var allItems: List<VideoItem> = emptyList()
+    private var filter = PlaylistFilter.ALL
     private var remoteOwner: String? = null
     private var remoteCount = -1
     private lateinit var message: TextView
@@ -93,13 +95,34 @@ class VideoListActivity : AppCompatActivity() {
             setHeader(pl.name, null, items)
         }
         adapter.progress = History.progressMap()
-        adapter.set(items.map { if (mode == "history") it.copy(uploadedMs = 0) else it })
-        message.visibility = if (items.isEmpty()) View.VISIBLE else View.GONE
+        showItems(items.map { if (mode == "history") it.copy(uploadedMs = 0) else it })
+    }
+
+    private fun setFilter(id: Int) {
+        if (filter == id) return
+        filter = id
+        showItems(allItems)
+        if (mode != "history") {
+            val title = findViewById<TextView>(R.id.barTitle).text.toString()
+            setHeader(title, remoteOwner, allItems, if (mode == "remote" && remoteCount >= 0) remoteCount else allItems.size)
+        }
+    }
+
+    private fun showItems(items: List<VideoItem>) {
+        allItems = items
+        val shown = if (mode == "history") items else PlaylistFilter.apply(items, filter)
+        adapter.set(shown)
+        message.visibility = if (shown.isEmpty()) View.VISIBLE else View.GONE
+        if (items.isNotEmpty() && shown.isEmpty()) {
+            message.text = "ไม่มีวิดีโอในตัวกรองนี้"
+            message.visibility = View.VISIBLE
+        }
     }
 
     private fun setHeader(title: String, owner: String?, items: List<VideoItem>, count: Int = items.size) {
         val cover = items.firstOrNull { PlayQueue.isPlayable(it) && it.thumb != null }?.thumb ?: items.firstOrNull()?.thumb
-        header.set(PlaylistHeaderAdapter.Info(title, owner, count, cover, items.any { PlayQueue.isPlayable(it) }))
+        val showFilter = mode == "liked" || mode == "local"
+        header.set(PlaylistHeaderAdapter.Info(title, owner, count, cover, items.any { PlayQueue.isPlayable(it) }, showFilter, filter))
     }
 
     /** "เล่นทั้งหมด" / tapping a video: play the list in order from [index], skipping videos that can't be played. */
@@ -164,7 +187,7 @@ class VideoListActivity : AppCompatActivity() {
         progress.visibility = View.VISIBLE
         job = lifecycleScope.launch {
             try {
-                val p = withContext(Dispatchers.IO) { Repo.playlistPager(intent.getStringExtra("url")!!) }
+                val p = withContext(Dispatchers.IO) { Repo.playlistPager(intent.getStringExtra("url").orEmpty()) }
                 pager = p
                 val items = Availability.apply(p.next())
                 val name = runCatching { p.extractor.name }.getOrNull()
@@ -173,7 +196,7 @@ class VideoListActivity : AppCompatActivity() {
                 remoteOwner = pe?.let { runCatching { it.uploaderName }.getOrNull() }
                 setTitleText(name ?: intent.getStringExtra("title").orEmpty(), if (remoteCount > 0) "$remoteCount วิดีโอ" else null)
                 adapter.progress = History.progressMap()
-                adapter.set(items)
+                showItems(items)
                 setHeader(name ?: intent.getStringExtra("title").orEmpty(), remoteOwner, items, if (remoteCount >= 0) remoteCount else items.size)
                 if (items.isEmpty()) { message.text = "เพลย์ลิสต์นี้ไม่มีวิดีโอ"; message.visibility = View.VISIBLE }
             } catch (e: CancellationException) { throw e
