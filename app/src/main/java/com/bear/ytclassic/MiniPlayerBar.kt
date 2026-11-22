@@ -51,9 +51,14 @@ class MiniPlayerBar private constructor(private val a: AppCompatActivity) : Defa
 
         /** Wire the bar of [a]'s layout to the shared player. Call from onCreate after setContentView. */
         fun attach(a: AppCompatActivity): MiniPlayerBar = MiniPlayerBar(a).also { it.setup() }
+
+        /** The bar can show when a video is playing and the full watch page is not in the foreground. */
+        fun shouldShow(pip: Boolean, watchForeground: Boolean, hasItem: Boolean): Boolean =
+            !pip && !watchForeground && hasItem
+
     }
 
-    private fun allowed() = !Playback.pip.value && !Playback.watchActive.value && Playback.state.value.item != null
+    private fun allowed() = shouldShow(Playback.pip.value, Playback.watchActive.value, Playback.state.value.item != null)
 
     private fun setup() {
         bar.setOnClickListener { Playback.state.value.item?.let { a.openVideo(it, expandFrom = 1f) } }

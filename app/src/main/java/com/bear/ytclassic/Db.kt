@@ -185,6 +185,18 @@ object Prefs {
     var dlQuality: Int get() = p.getInt("dl_quality", 720); set(v) = p.edit().putInt("dl_quality", v).apply()
     var dlAudioOnly: Boolean get() = b("dl_audio", false); set(v) = setB("dl_audio", v)
     var dlAsk: Boolean get() = b("dl_ask", true); set(v) = setB("dl_ask", v)
+    /** Captions: on/off, last language tag (blank = auto), font size (0/1/2). */
+    var ccEnabled: Boolean get() = b("cc_on", false); set(v) = setB("cc_on", v)
+    var ccLanguage: String
+        get() = p.getString("cc_lang", "") ?: ""
+        set(v) { p.edit().putString("cc_lang", v).apply() }
+    var ccFontSize: Int
+        get() = p.getInt("cc_size", Captions.SIZE_NORMAL)
+        set(v) { p.edit().putInt("cc_size", v).apply() }
+    /** Preferred audio language tag (blank = original track). */
+    var audioLanguage: String
+        get() = p.getString("audio_lang", "") ?: ""
+        set(v) { p.edit().putString("audio_lang", v).apply() }
     val qualityHeights = intArrayOf(0, 1080, 720, 480, 360, 240, 144)
     fun qualityName(h: Int, zero: String = "อัตโนมัติ") = if (h == 0) zero else "${h}p"
     fun applyTheme() = AppCompatDelegate.setDefaultNightMode(when (theme) {

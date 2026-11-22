@@ -3,14 +3,20 @@ package com.bear.ytclassic
 import android.widget.TextView
 import android.widget.Toast
 import androidx.appcompat.app.AlertDialog
+import androidx.core.content.ContextCompat
 
 /** Classic red "ติดตาม" / grey "ติดตามแล้ว" button backed by [Subs]. */
-fun TextView.bindSubscribe(channel: () -> Channel?, onChange: () -> Unit = {}, capsule: Boolean = false) {
+fun TextView.bindSubscribe(channel: () -> Channel?, onChange: () -> Unit = {}, capsule: Boolean = false, filled: Boolean = false) {
     fun render() {
         val ch = channel()
         val subbed = ch != null && Subs.isSubscribed(ch.url)
         text = if (subbed) "ติดตามแล้ว" else "ติดตาม"
-        setTextColor(if (subbed || capsule) androidx.core.content.ContextCompat.getColor(context, if (capsule) R.color.text1 else R.color.text2) else 0xFFCC0000.toInt())
+        if (filled) {
+            setBackgroundResource(if (subbed) R.drawable.bg_subscribed else R.drawable.bg_subscribe)
+            setTextColor(if (subbed) ContextCompat.getColor(context, R.color.text1) else 0xFFFFFFFF.toInt())
+        } else {
+            setTextColor(if (subbed || capsule) ContextCompat.getColor(context, if (capsule) R.color.text1 else R.color.text2) else 0xFFCC0000.toInt())
+        }
         alpha = if (ch == null) 0.5f else 1f
     }
     render()

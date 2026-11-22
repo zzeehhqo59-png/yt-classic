@@ -1,5 +1,9 @@
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android" android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="vertical">
+  <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="horizontal" android:gravity="center_vertical" android:paddingStart="16dp" android:paddingEnd="8dp" android:paddingTop="8dp">
+    <TextView android:id="@+id/subsTitle" android:layout_width="0dp" android:layout_weight="1" android:layout_height="wrap_content" android:textColor="@color/text1" android:textSize="16sp" android:textStyle="bold"/>
+    <TextView android:id="@+id/btnManage" android:layout_width="wrap_content" android:layout_height="wrap_content" android:padding="8dp" android:text="จัดการ" android:textColor="@color/link" android:textSize="14sp" android:background="?attr/selectableItemBackground"/>
+  </LinearLayout>
   <androidx.recyclerview.widget.RecyclerView android:id="@+id/channels" android:layout_width="match_parent" android:layout_height="wrap_content" android:paddingStart="4dp" android:clipToPadding="false"/>
   <View android:layout_width="match_parent" android:layout_height="1dp" android:background="@color/divider"/>
-  <View android:layout_width="match_parent" android:layout_height="8dp"/>
+  <TextView android:id="@+id/feedTitle" android:layout_width="match_parent" android:layout_height="wrap_content" android:paddingStart="16dp" android:paddingEnd="16dp" android:paddingTop="12dp" android:paddingBottom="4dp" android:text="วิดีโอล่าสุด" android:textColor="@color/text1" android:textSize="16sp" android:textStyle="bold"/>
 </LinearLayout>

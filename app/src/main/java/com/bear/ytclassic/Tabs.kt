@@ -26,7 +26,7 @@ import kotlinx.coroutines.launch
 
 /** การติดตาม tab: subscribed channels row + newest videos from all of them. */
 class SubsFragment : Fragment() {
-    private val channels = ChannelRowAdapter()
+    private val channels = ChannelRowAdapter { load(force = false) }
     private val header = SubsHeader()
     private lateinit var videos: VideoAdapter
     private var loadedVersion = -1L
@@ -71,6 +71,7 @@ class SubsFragment : Fragment() {
         val subs = Subs.all()
         channels.set(subs)
         header.visible = subs.isNotEmpty()
+        if (header.visible) header.notifyItemChanged(0)
         if (subs.isEmpty()) {
             videos.set(emptyList()); refresh.isRefreshing = false; progress.visibility = View.GONE
             text.text = "ยังไม่ได้ติดตามช่องใด\n\nกด \"ติดตาม\" ในหน้าวิดีโอหรือหน้าช่อง\nหรือนำเข้าการติดตามจากไฟล์ในแท็บคุณ"
@@ -103,6 +104,21 @@ class SubsFragment : Fragment() {
         }
     }
 
+    private fun manageSubs() {
+        val ctx = requireContext()
+        val list = Subs.all()
+        if (list.isEmpty()) return
+        AlertDialog.Builder(ctx)
+            .setTitle("ช่องที่ติดตาม")
+            .setItems(list.map { it.name }.toTypedArray()) { _, w ->
+                val ch = list[w]
+                AlertDialog.Builder(ctx).setItems(arrayOf("เปิดช่อง", "เลิกติดตาม")) { _, a ->
+                    if (a == 0) ctx.openChannel(ch.url, ch.name, ch.avatar)
+                    else { Subs.remove(ch.url); load(force = false) }
+                }.setNegativeButton("ยกเลิก", null).show()
+            }.setNegativeButton("ปิด", null).show()
+    }
+
     private inner class SubsHeader : RecyclerView.Adapter<RecyclerView.ViewHolder>() {
         var visible = false
             set(v) { if (field != v) { field = v; if (v) notifyItemInserted(0) else notifyItemRemoved(0) } }
@@ -113,13 +129,17 @@ class SubsFragment : Fragment() {
                 layoutManager = LinearLayoutManager(parent.context, LinearLayoutManager.HORIZONTAL, false)
                 adapter = channels
             }
+            v.findViewById<View>(R.id.btnManage).setOnClickListener { manageSubs() }
             return object : RecyclerView.ViewHolder(v) {}
         }
-        override fun onBindViewHolder(h: RecyclerView.ViewHolder, position: Int) {}
+        override fun onBindViewHolder(h: RecyclerView.ViewHolder, position: Int) {
+            val n = Subs.count()
+            h.itemView.findViewById<TextView>(R.id.subsTitle).text = "ช่องที่ติดตาม ($n)"
+        }
     }
 }
 
-class ChannelRowAdapter : RecyclerView.Adapter<ChannelRowAdapter.VH>() {
+class ChannelRowAdapter(private val onChange: () -> Unit = {}) : RecyclerView.Adapter<ChannelRowAdapter.VH>() {
     private val items = ArrayList<Channel>()
     fun set(list: List<Channel>) { items.clear(); items.addAll(list); notifyDataSetChanged() }
     override fun getItemCount() = items.size
@@ -130,6 +150,12 @@ class ChannelRowAdapter : RecyclerView.Adapter<ChannelRowAdapter.VH>() {
         h.avatar.loadAvatar(c.avatar)
         h.name.text = c.name
         h.itemView.setOnClickListener { it.context.openChannel(c.url, c.name, c.avatar) }
+        h.itemView.setOnLongClickListener { v ->
+            AlertDialog.Builder(v.context).setMessage("เลิกติดตาม ${c.name} ใช่ไหม")
+                .setPositiveButton("เลิกติดตาม") { _, _ -> Subs.remove(c.url); onChange() }
+                .setNegativeButton("ยกเลิก", null).show()
+            true
+        }
     }
     class VH(v: View) : RecyclerView.ViewHolder(v) {
         val avatar: ImageView = v.findViewById(R.id.avatar)

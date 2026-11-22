@@ -12,7 +12,6 @@ import androidx.appcompat.app.AppCompatActivity
 import coil3.load
 import com.google.android.exoplayer2.C
 import com.google.android.exoplayer2.Player
-import com.google.android.exoplayer2.trackselection.TrackSelectionOverride
 import com.google.android.exoplayer2.ui.StyledPlayerView
 import org.schabi.newpipe.extractor.stream.StreamInfo
 
@@ -37,6 +36,7 @@ class WatchControls(private val a: AppCompatActivity, private val playerView: St
     }
 
     private val player get() = Playback.player
+    private val tracks = WatchTracks(a, playerView)
     private val qualities get() = Playback.qualities
     private val live get() = Playback.live
     /** Controls currently shown. */
@@ -77,7 +77,7 @@ class WatchControls(private val a: AppCompatActivity, private val playerView: St
     private val ctlListener = object : Player.Listener {
         override fun onIsPlayingChanged(isPlaying: Boolean) { updatePlayButton(); scheduleHide() }
         override fun onPlaybackStateChanged(state: Int) { updatePlayButton(); updateTime() }
-        override fun onTracksChanged(tracks: com.google.android.exoplayer2.Tracks) = updateCC()
+        override fun onTracksChanged(t: com.google.android.exoplayer2.Tracks) { tracks.applyPrefs(); updateCC() }
     }
 
     private fun pickQuality() {
@@ -111,7 +111,7 @@ class WatchControls(private val a: AppCompatActivity, private val playerView: St
         centerRow = a.findViewById(R.id.centerRow)
         btnPlay.setOnClickListener {
             when {
-                player.playbackState == Player.STATE_ENDED -> { player.seekTo(0); player.play() }
+                player.playbackState == Player.STATE_ENDED -> { Playback.cancelAutoplay(); player.seekTo(0); player.play() }
                 player.playWhenReady -> player.pause()
                 else -> { if (player.playbackState == Player.STATE_IDLE) player.prepare(); player.play() }
             }
@@ -126,7 +126,7 @@ class WatchControls(private val a: AppCompatActivity, private val playerView: St
             Prefs.autoplay = !Prefs.autoplay; btnAutoplay.checked = Prefs.autoplay
             Toast.makeText(a, if (Prefs.autoplay) "เปิดเล่นอัตโนมัติแล้ว" else "ปิดเล่นอัตโนมัติแล้ว", Toast.LENGTH_SHORT).show(); scheduleHide()
         }
-        btnCC.setOnClickListener { toggleCC(); scheduleHide() }
+        btnCC.setOnClickListener { tracks.toggle(); updateCC(); scheduleHide() }
         a.findViewById<View>(R.id.btnSettings).setOnClickListener { settingsSheet() }
         btnFull.setOnClickListener { host.toggleFullscreen() }
         a.findViewById<View>(R.id.btnBack).setOnClickListener { host.toggleFullscreen() }
@@ -249,53 +249,36 @@ class WatchControls(private val a: AppCompatActivity, private val playerView: St
     }
 
     // ---- captions ----
-    private fun textGroups() = player.currentTracks.groups.filter { it.type == C.TRACK_TYPE_TEXT && it.length > 0 }
-    private fun captionsOn() = textGroups().any { it.isSelected } && !player.trackSelectionParameters.disabledTrackTypes.contains(C.TRACK_TYPE_TEXT)
     fun updateCC() {
         if (!::btnCC.isInitialized) return
-        val has = textGroups().isNotEmpty()
-        btnCC.alpha = if (!has) 0.4f else if (captionsOn()) 1f else 0.7f
-        btnCC.setColorFilter(if (captionsOn()) 0xFFFFFFFF.toInt() else 0xFFBDBDBD.toInt())
-        btnCC.contentDescription = if (captionsOn()) "ปิดคำบรรยาย" else "เปิดคำบรรยาย"
-    }
-    private fun captionLabel(g: com.google.android.exoplayer2.Tracks.Group): String {
-        val f = g.getTrackFormat(0)
-        return f.label ?: f.language?.let { java.util.Locale.forLanguageTag(it).getDisplayName(java.util.Locale("th")) } ?: "คำบรรยาย"
-    }
-    private fun selectCaption(g: com.google.android.exoplayer2.Tracks.Group?) {
-        val b = player.trackSelectionParameters.buildUpon().clearOverridesOfType(C.TRACK_TYPE_TEXT)
-        if (g == null) b.setTrackTypeDisabled(C.TRACK_TYPE_TEXT, true)
-        else b.setTrackTypeDisabled(C.TRACK_TYPE_TEXT, false).setOverrideForType(TrackSelectionOverride(g.mediaTrackGroup, 0))
-        player.trackSelectionParameters = b.build()
-        playerView.postDelayed({ updateCC() }, 300)
-    }
-    private fun toggleCC() {
-        val groups = textGroups()
-        if (groups.isEmpty()) { Toast.makeText(a, "วิดีโอนี้ไม่มีคำบรรยาย", Toast.LENGTH_SHORT).show(); return }
-        if (captionsOn()) { selectCaption(null); Toast.makeText(a, "ปิดคำบรรยายแล้ว", Toast.LENGTH_SHORT).show(); return }
-        // prefer Thai, then any non-auto track (they come first), then the first one
-        val g = groups.firstOrNull { it.getTrackFormat(0).language?.startsWith("th") == true } ?: groups.first()
-        selectCaption(g)
-        Toast.makeText(a, "คำบรรยาย: ${captionLabel(g)}", Toast.LENGTH_SHORT).show()
-    }
-    private fun captionsSheet() {
-        val groups = textGroups()
-        if (groups.isEmpty()) { Toast.makeText(a, "วิดีโอนี้ไม่มีคำบรรยาย", Toast.LENGTH_SHORT).show(); return }
-        val sel = if (captionsOn()) groups.indexOfFirst { it.isSelected } + 1 else 0
-        a.choiceSheet("คำบรรยาย", listOf("ปิด") + groups.map { captionLabel(it) }, sel) { i -> selectCaption(if (i == 0) null else groups[i - 1]) }
+        val on = tracks.captionsOn()
+        val has = tracks.textGroups().isNotEmpty()
+        btnCC.alpha = if (!has) 0.4f else if (on) 1f else 0.7f
+        btnCC.setColorFilter(if (on) 0xFFFFFFFF.toInt() else 0xFFBDBDBD.toInt())
+        btnCC.contentDescription = if (on) "ปิดคำบรรยาย" else "เปิดคำบรรยาย"
     }
 
-    /** ⚙: คุณภาพ / ความเร็วในการเล่น / คำบรรยาย. */
+    private fun fontSheet() {
+        a.choiceSheet("ขนาดคำบรรยาย", Captions.sizeNames.toList(), Prefs.ccFontSize) { i ->
+            Prefs.ccFontSize = i
+            tracks.applyFont()
+        }
+    }
+
+    /** ⚙: คุณภาพ / ความเร็วในการเล่น / คำบรรยาย / แทร็กเสียง. */
     private fun settingsSheet() {
         playerView.removeCallbacks(hideCtl)
         val q = qualities.getOrNull(Playback.current)?.label ?: "—"
         val sp = player.playbackParameters.speed
-        val groups = textGroups()
-        val cc = if (groups.isEmpty()) "ไม่มี" else if (captionsOn()) groups.firstOrNull { it.isSelected }?.let { captionLabel(it) } ?: "เปิด" else "ปิด"
+        val cc = tracks.captionSummary()
         val d = a.sheet { box, dlg ->
             box.sheetRow(R.drawable.ic_tune, "คุณภาพ", q, end = chevron()) { dlg.dismiss(); pickQuality() }
             box.sheetRow(R.drawable.ic_speed, "ความเร็วในการเล่น", speedLabel(sp), end = chevron()) { dlg.dismiss(); speedSheet() }
-            box.sheetRow(R.drawable.ic_cc, "คำบรรยาย", cc, end = chevron()) { dlg.dismiss(); captionsSheet() }
+            box.sheetRow(R.drawable.ic_cc, "คำบรรยาย", cc, end = chevron()) { dlg.dismiss(); tracks.captionsSheet() }
+            box.sheetRow(R.drawable.ic_cc, "ขนาดคำบรรยาย", Captions.sizeNames.getOrElse(Prefs.ccFontSize) { "ปกติ" }, end = chevron()) { dlg.dismiss(); fontSheet() }
+            tracks.audioSummary()?.let { audio ->
+                box.sheetRow(R.drawable.ic_audio, "แทร็กเสียง", audio, end = chevron()) { dlg.dismiss(); tracks.audioSheet() }
+            }
         }
         d.setOnDismissListener { scheduleHide() }
     }
@@ -381,7 +364,7 @@ class WatchControls(private val a: AppCompatActivity, private val playerView: St
     fun attach() {
         player.addListener(ctlListener)
         playerView.removeCallbacks(ticker); playerView.post(ticker)
-        updatePlayButton(); updateCC()
+        updatePlayButton(); tracks.applyFont(); updateCC()
     }
 
     fun detach() {

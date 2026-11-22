@@ -24,6 +24,14 @@ fun View.showVideoMenu(v: VideoItem, extra: List<Pair<String, () -> Unit>> = emp
     val actions = ArrayList<() -> Unit>()
     fun add(title: String, a: () -> Unit) { m.menu.add(0, actions.size, actions.size, title); actions.add(a) }
     if (v.kind == 0) {
+        if (PlayQueue.isPlayable(v)) {
+            add("เล่นเป็นเพลงถัดไป") {
+                PlayQueue.playNext(v); Toast.makeText(c, "จะเล่นเป็นเพลงถัดไป", Toast.LENGTH_SHORT).show()
+            }
+            add("เพิ่มลงในคิว") {
+                PlayQueue.add(v); Toast.makeText(c, "เพิ่มลงในคิวแล้ว", Toast.LENGTH_SHORT).show()
+            }
+        }
         val inWl = Playlists.contains(Playlists.WATCH_LATER, v.url)
         if (!inWl) add("บันทึกลงในดูภายหลัง") {
             Playlists.add(Playlists.WATCH_LATER, v); Toast.makeText(c, "บันทึกลงในดูภายหลังแล้ว", Toast.LENGTH_SHORT).show()

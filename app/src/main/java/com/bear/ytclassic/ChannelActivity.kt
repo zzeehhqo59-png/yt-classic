@@ -8,14 +8,15 @@ import android.view.View
 import android.view.ViewGroup
 import android.widget.ImageView
 import android.widget.TextView
+import androidx.activity.viewModels
 import androidx.appcompat.app.AppCompatActivity
+import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.lifecycleScope
+import androidx.lifecycle.repeatOnLifecycle
 import androidx.recyclerview.widget.ConcatAdapter
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import coil3.load
-import kotlinx.coroutines.CancellationException
-import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 
 fun Context.openChannel(url: String?, name: String, avatar: String?) {
@@ -25,14 +26,13 @@ fun Context.openChannel(url: String?, name: String, avatar: String?) {
 }
 
 class ChannelActivity : AppCompatActivity() {
-    override fun onResume() { super.onResume(); videos.refreshProgress() }
-    private lateinit var url: String
-    private var ch: Channel? = null
-    private var banner: String? = null
+    private val vm: ChannelViewModel by viewModels()
     private val header = Header()
     private val videos = VideoAdapter(false) { openVideo(it) }
-    private var pager: Pager? = null
-    private var job: Job? = null
+    private var descExpanded = false
+    private var boundVideos: List<VideoItem> = emptyList()
+
+    override fun onResume() { super.onResume(); videos.refreshProgress() }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -40,50 +40,33 @@ class ChannelActivity : AppCompatActivity() {
         setContentView(R.layout.activity_channel)
         MiniPlayerBar.attach(this)
         findViewById<View>(R.id.root).padForSystemBars()
-        url = intent.getStringExtra("url")!!
-        ch = Channel(url, intent.getStringExtra("name").orEmpty(), intent.getStringExtra("avatar"))
-        findViewById<TextView>(R.id.barTitle).text = ch?.name
+        val url = intent.getStringExtra("url").orEmpty()
+        if (url.isBlank()) { finish(); return }
+        val name = intent.getStringExtra("name").orEmpty()
+        val avatar = intent.getStringExtra("avatar")
+        findViewById<TextView>(R.id.barTitle).text = name
         findViewById<View>(R.id.btnBack).setOnClickListener { finish() }
         findViewById<View>(R.id.btnSearch).setOnClickListener { startActivity(Intent(this, SearchActivity::class.java)) }
         val list = findViewById<RecyclerView>(R.id.list)
         list.layoutManager = LinearLayoutManager(this)
         list.adapter = ConcatAdapter(header, videos)
-        list.onNearEnd { loadMore() }
-        load()
+        list.onNearEnd { vm.loadMore() }
+        lifecycleScope.launch {
+            repeatOnLifecycle(Lifecycle.State.STARTED) { vm.ui.collect { render(it) } }
+        }
+        vm.load(url, name, avatar)
     }
 
-    private fun load() {
-        val progress = findViewById<View>(R.id.progress)
+    private fun render(st: ChannelUiState) {
+        findViewById<View>(R.id.progress).visibility = if (st.loading) View.VISIBLE else View.GONE
         val msg = findViewById<TextView>(R.id.message)
-        progress.visibility = View.VISIBLE
-        job = lifecycleScope.launch {
-            try {
-                val info = Repo.channel(url)
-                ch = Channel(url, info.name, info.avatars.pick(176) ?: ch?.avatar, info.subscriberCount)
-                banner = info.banners.pick(400)
-                if (Subs.isSubscribed(url)) Subs.update(ch!!)
-                findViewById<TextView>(R.id.barTitle).text = info.name
-                header.notifyItemChanged(0)
-                val p = Repo.channelVideos(url)
-                pager = p
-                videos.set(p.next())
-                if (videos.items.isEmpty()) { msg.text = "ช่องนี้ยังไม่มีวิดีโอ"; msg.visibility = View.VISIBLE }
-            } catch (e: CancellationException) { throw e
-            } catch (e: Throwable) {
-                msg.text = Errors.list(e).replace("รายการวิดีโอ", "ช่องนี้"); msg.visibility = View.VISIBLE
-            } finally { progress.visibility = View.GONE }
-        }
-    }
-
-    private fun loadMore() {
-        val p = pager ?: return
-        if (job?.isActive == true || !p.hasMore) return
-        videos.loadingMore = true
-        job = lifecycleScope.launch {
-            try { val more = p.next(); videos.loadingMore = false; videos.add(more) }
-            catch (e: CancellationException) { throw e } catch (_: Throwable) { }
-            finally { videos.loadingMore = false }
-        }
+        val text = st.error ?: st.emptyMessage
+        msg.text = text.orEmpty()
+        msg.visibility = if (text != null) View.VISIBLE else View.GONE
+        st.channel?.name?.let { findViewById<TextView>(R.id.barTitle).text = it }
+        videos.loadingMore = st.loadingMore
+        if (boundVideos != st.videos) { boundVideos = st.videos; videos.set(st.videos) }
+        header.notifyItemChanged(0)
     }
 
     private inner class Header : RecyclerView.Adapter<RecyclerView.ViewHolder>() {
@@ -92,14 +75,28 @@ class ChannelActivity : AppCompatActivity() {
             LayoutInflater.from(parent.context).inflate(R.layout.item_channel_header, parent, false)) {}
         override fun onBindViewHolder(h: RecyclerView.ViewHolder, position: Int) {
             val v = h.itemView
-            val c = ch
+            val st = vm.ui.value
+            val c = st.channel
             v.findViewById<ImageView>(R.id.banner).apply {
-                if (banner != null) { visibility = View.VISIBLE; load(banner) } else visibility = View.GONE
+                if (st.banner != null) { visibility = View.VISIBLE; load(st.banner) } else visibility = View.GONE
             }
             v.findViewById<ImageView>(R.id.avatar).loadAvatar(c?.avatar)
             v.findViewById<TextView>(R.id.name).text = c?.name
+            val handle = Fmt.channelLabel(c?.name.orEmpty(), c?.url).takeIf { it.startsWith("@") }
+            v.findViewById<TextView>(R.id.handle).apply {
+                text = handle.orEmpty(); visibility = if (handle == null) View.GONE else View.VISIBLE
+            }
             v.findViewById<TextView>(R.id.subs).text = Fmt.subscribers(c?.subscribers ?: -1)
-            v.findViewById<TextView>(R.id.btnSubscribe).bindSubscribe({ ch })
+            v.findViewById<TextView>(R.id.btnSubscribe).bindSubscribe({ c }, filled = true)
+            val desc = v.findViewById<TextView>(R.id.description)
+            if (st.description.isBlank()) desc.visibility = View.GONE
+            else {
+                desc.visibility = View.VISIBLE
+                desc.maxLines = if (descExpanded) Integer.MAX_VALUE else 2
+                desc.ellipsize = if (descExpanded) null else android.text.TextUtils.TruncateAt.END
+                desc.text = st.description
+                desc.setOnClickListener { descExpanded = !descExpanded; notifyItemChanged(0) }
+            }
         }
     }
 }

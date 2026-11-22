@@ -24,6 +24,7 @@ import androidx.lifecycle.repeatOnLifecycle
 import androidx.recyclerview.widget.ConcatAdapter
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
+import coil3.load
 import com.google.android.exoplayer2.Player
 import com.google.android.exoplayer2.ui.StyledPlayerView
 import kotlinx.coroutines.launch
@@ -132,6 +133,7 @@ class WatchActivity : AppCompatActivity() {
                 vm.ui.collect { render(it) }
             }
         }
+        setupAutoplayCard()
     }
 
     override fun onNewIntent(intent: Intent) {
@@ -250,13 +252,16 @@ class WatchActivity : AppCompatActivity() {
         player.removeListener(pipListener)
         ctl.detach()
         playerView.player = null
+        if (!isFinishing && !inPip && !Playback.pip.value) Playback.watchActive.value = false
     }
 
     /** Take the video surface back (the mini bar may have grabbed it). */
     private fun reattach() { playerView.player = null; playerView.player = player }
 
     override fun onResume() {
-        super.onResume(); reattach(); internalNav = false; updatePipParams(); header.notifyItemChanged(0)
+        super.onResume()
+        if (!inPip) Playback.watchActive.value = true
+        reattach(); internalNav = false; updatePipParams(); header.notifyItemChanged(0)
         // the controller's time label can stay at 00:00 after re-attaching while paused: nudge it with a no-op seek
         playerView.postDelayed({
             if (!player.isPlaying && player.playbackState == Player.STATE_READY) player.seekTo(player.currentPosition)
@@ -267,6 +272,7 @@ class WatchActivity : AppCompatActivity() {
     private var internalNav = false
     override fun startActivity(intent: Intent, options: Bundle?) {
         internalNav = true
+        if (!inPip) Playback.watchActive.value = false
         if (Build.VERSION.SDK_INT >= 31) runCatching { setPictureInPictureParams(PictureInPictureParams.Builder().setAutoEnterEnabled(false).build()) }
         val opts = options ?: android.app.ActivityOptions.makeCustomAnimation(this, R.anim.no_anim, R.anim.no_anim).toBundle()
         super.startActivity(intent, opts)
@@ -288,14 +294,13 @@ class WatchActivity : AppCompatActivity() {
     }
 
     private fun updatePipParams() {
-        if (Build.VERSION.SDK_INT >= 26 && pipAllowed()) runCatching { setPictureInPictureParams(pipParams()!!) }
-        else if (Build.VERSION.SDK_INT >= 31) runCatching { setPictureInPictureParams(pipParams()!!) }
+        pipParams()?.let { params -> runCatching { setPictureInPictureParams(params) } }
     }
 
     override fun onUserLeaveHint() {
         super.onUserLeaveHint()
         if (Build.VERSION.SDK_INT in 26..30 && !internalNav && pipAllowed() && wantsPlay()) {
-            runCatching { enterPictureInPictureMode(pipParams()!!) }
+            pipParams()?.let { params -> runCatching { enterPictureInPictureMode(params) } }
         }
     }
 
@@ -308,7 +313,7 @@ class WatchActivity : AppCompatActivity() {
             // the popup was closed with its X: stop playback and leave
             player.pause(); finish(); return
         }
-        if (inPip) ctl.show(false, animate = false)
+        if (inPip) { ctl.show(false, animate = false); findViewById<View>(R.id.autoplayCard).visibility = View.GONE }
         list.visibility = if (inPip) View.GONE else View.VISIBLE
         applyLayout(newConfig)
     }
@@ -338,6 +343,41 @@ class WatchActivity : AppCompatActivity() {
     private fun toggleFullscreen() {
         runCatching {
             requestedOrientation = if (isLandscape()) ActivityInfo.SCREEN_ORIENTATION_PORTRAIT else ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE
+        }
+    }
+
+    private var autoplayBound: Autoplay.Offer? = null
+    private val autoplayTick = object : Runnable {
+        override fun run() {
+            val card = findViewById<View>(R.id.autoplayCard)
+            val offer = Playback.autoplayOffer.value
+            if (offer == null || inPip) {
+                card.visibility = View.GONE
+                return
+            }
+            val sec = ((offer.remainingMs(System.currentTimeMillis()) + 999) / 1000).toInt().coerceAtLeast(1)
+            findViewById<TextView>(R.id.autoplayLabel).text = "เล่นต่อไปใน $sec วินาที"
+            card.postDelayed(this, 200)
+        }
+    }
+
+    private fun setupAutoplayCard() {
+        val card = findViewById<View>(R.id.autoplayCard)
+        card.setOnClickListener { Playback.confirmAutoplay() }
+        findViewById<View>(R.id.autoplayCancel).setOnClickListener { Playback.cancelAutoplay() }
+        lifecycleScope.launch {
+            repeatOnLifecycle(Lifecycle.State.STARTED) {
+                Playback.autoplayOffer.collect { offer ->
+                    card.removeCallbacks(autoplayTick)
+                    autoplayBound = offer
+                    if (offer == null || inPip) { card.visibility = View.GONE; return@collect }
+                    findViewById<TextView>(R.id.autoplayTitle).text = offer.next.title
+                    val thumb = findViewById<android.widget.ImageView>(R.id.autoplayThumb)
+                    if (thumb.tag != offer.next.thumb) { thumb.tag = offer.next.thumb; thumb.load(offer.next.thumb) }
+                    card.visibility = View.VISIBLE
+                    autoplayTick.run()
+                }
+            }
         }
     }
 

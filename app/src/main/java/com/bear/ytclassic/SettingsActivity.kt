@@ -48,6 +48,29 @@ class SettingsActivity : AppCompatActivity() {
         qualityItem("คุณภาพเริ่มต้นเมื่อใช้เน็ตมือถือ", { Prefs.qualityMobile }) { Prefs.qualityMobile = it }
         note("อัตโนมัติ = ปรับความละเอียดตามความเร็วเน็ต เปลี่ยนคุณภาพได้ทุกเมื่อจากปุ่มคุณภาพในหน้าวิดีโอ")
 
+        section("คำบรรยายและเสียง")
+        switch("แสดงคำบรรยาย", "เปิดคำบรรยายอัตโนมัติเมื่อวิดีโอมีคำบรรยาย", Prefs.ccEnabled) { Prefs.ccEnabled = it }
+        item("ภาษาคำบรรยาย", captionLangName()) {
+            val opts = langOptions(Prefs.ccLanguage)
+            AlertDialog.Builder(this).setTitle("ภาษาคำบรรยาย")
+                .setSingleChoiceItems(opts.map { it.second }.toTypedArray(), opts.indexOfFirst { it.first == Prefs.ccLanguage }.coerceAtLeast(0)) { dlg, w ->
+                    dlg.dismiss(); Prefs.ccLanguage = opts[w].first; build()
+                }.setNegativeButton("ยกเลิก", null).show()
+        }
+        item("ขนาดตัวอักษร", Captions.sizeNames.getOrElse(Prefs.ccFontSize) { "ปกติ" }) {
+            AlertDialog.Builder(this).setTitle("ขนาดตัวอักษร")
+                .setSingleChoiceItems(Captions.sizeNames, Prefs.ccFontSize) { dlg, w -> dlg.dismiss(); Prefs.ccFontSize = w; build() }
+                .setNegativeButton("ยกเลิก", null).show()
+        }
+        item("ภาษาเสียงที่ชอบ", audioLangName()) {
+            val opts = langOptions(Prefs.audioLanguage)
+            AlertDialog.Builder(this).setTitle("ภาษาเสียงที่ชอบ")
+                .setSingleChoiceItems(opts.map { it.second }.toTypedArray(), opts.indexOfFirst { it.first == Prefs.audioLanguage }.coerceAtLeast(0)) { dlg, w ->
+                    dlg.dismiss(); Prefs.audioLanguage = opts[w].first; build()
+                }.setNegativeButton("ยกเลิก", null).show()
+        }
+        note("ถ้าวิดีโอไม่มีภาษาที่เลือก จะใช้คำบรรยายอัตโนมัติ และใช้แทร็กเสียงต้นฉบับ")
+
         section("การดาวน์โหลด")
         val dlNames = Prefs.qualityHeights.map { Prefs.qualityName(it, "สูงสุดที่มี") }.toTypedArray()
         item("คุณภาพการดาวน์โหลดเริ่มต้น", Prefs.qualityName(Prefs.dlQuality, "สูงสุดที่มี")) {
@@ -137,4 +160,19 @@ class SettingsActivity : AppCompatActivity() {
                 .setNegativeButton("ยกเลิก", null).show()
         }
     }
+
+    private fun commonLangs() = listOf(
+        "" to "อัตโนมัติ", "th" to "ไทย", "en" to "อังกฤษ", "ja" to "ญี่ปุ่น", "ko" to "เกาหลี",
+        "zh" to "จีน", "es" to "สเปน", "fr" to "ฝรั่งเศส", "de" to "เยอรมัน", "pt" to "โปรตุเกส",
+        "ru" to "รัสเซีย", "id" to "อินโดนีเซีย", "vi" to "เวียดนาม",
+    )
+    private fun langOptions(current: String): List<Pair<String, String>> {
+        val base = commonLangs()
+        return if (current.isNotBlank() && base.none { it.first == current }) {
+            base.take(1) + listOf(current to Captions.displayLanguage(current)) + base.drop(1)
+        } else base
+    }
+    private fun captionLangName() = if (Prefs.ccLanguage.isBlank()) "อัตโนมัติ" else Captions.displayLanguage(Prefs.ccLanguage)
+    private fun audioLangName() = if (Prefs.audioLanguage.isBlank()) "ต้นฉบับ (อัตโนมัติ)" else Captions.displayLanguage(Prefs.audioLanguage)
+
 }

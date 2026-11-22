@@ -32,7 +32,6 @@ import kotlinx.coroutines.withContext
 import org.schabi.newpipe.extractor.MediaFormat
 import org.schabi.newpipe.extractor.exceptions.ContentNotAvailableException
 import org.schabi.newpipe.extractor.stream.AudioStream
-import org.schabi.newpipe.extractor.stream.AudioTrackType
 import org.schabi.newpipe.extractor.stream.DeliveryMethod
 import org.schabi.newpipe.extractor.stream.StreamInfo
 import org.schabi.newpipe.extractor.stream.StreamType
@@ -64,6 +63,10 @@ object Playback {
     var current = -1; private set
     var live = false; private set
     private var subtitles: List<SubtitlesStream> = emptyList()
+    var audioTracks: List<AudioTracks.Track> = emptyList(); private set
+    var currentAudio: AudioTracks.Track? = null; private set
+    private val _autoplay = kotlinx.coroutines.flow.MutableStateFlow<Autoplay.Offer?>(null)
+    val autoplayOffer: StateFlow<Autoplay.Offer?> = _autoplay
     private var loadJob: Job? = null
     private val dsFactory by lazy { YtDataSource.Factory(DownloaderImpl.instance.client) }
     private var appVisible = true
@@ -91,9 +94,10 @@ object Playback {
                     override fun onPlaybackStateChanged(s: Int) {
                         if (s == Player.STATE_READY && _state.value.loading) _state.value = _state.value.copy(loading = false)
                         if (s == Player.STATE_READY && System.currentTimeMillis() - lastRetryAt > 60_000) retries = 0
-                        if (s == Player.STATE_ENDED) _state.value.item?.let { val d = p.duration; if (d > 0) History.updatePosition(it.url, d, d) }
-                        // เล่นอัตโนมัติ: continue with the up-next video
-                        if (s == Player.STATE_ENDED && Prefs.autoplay && !offline && !live) handler.post { next() }
+                        if (s == Player.STATE_ENDED) {
+                            _state.value.item?.let { val d = p.duration; if (d > 0) History.updatePosition(it.url, d, d) }
+                            offerAutoplay()
+                        }
                     }
                     override fun onIsPlayingChanged(isPlaying: Boolean) {
                         if (!isPlaying) savePosition()
@@ -114,18 +118,44 @@ object Playback {
     private val back = ArrayList<VideoItem>()
     private var goingBack = false
     fun hasPrev() = back.isNotEmpty()
-    /** Up next = the next playable video of the "เล่นทั้งหมด" queue, else the first playable related video. */
-    fun nextItem(): VideoItem? = when {
-        offline -> null
-        PlayQueue.active -> PlayQueue.peekNext()
-        else -> _state.value.info?.relatedItems?.videosOnly()?.firstOrNull { it.unplayableBadge() == null && !it.live && !it.upcoming }
-    }
-    fun next() { nextItem()?.let { open(it) } }
+    fun relatedItem(): VideoItem? =
+        _state.value.info?.relatedItems?.videosOnly()?.firstOrNull { it.unplayableBadge() == null && !it.live && !it.upcoming }
+
+    /** Up next = user/playlist queue, else the first playable related video. */
+    fun nextItem(): VideoItem? = if (offline) null else PlayQueue.peekNext() ?: relatedItem()
+
+    fun next() { cancelAutoplay(); nextItem()?.let { open(it) } }
+
     /** ⏮: restart the video if it has played a while, else go back to the previous one. */
     fun prev() {
-        if (player.currentPosition > 5000 || back.isEmpty()) { player.seekTo(0); return }
+        cancelAutoplay()
+        if (PlaybackNav.shouldRestart(player.currentPosition, back.isNotEmpty())) { player.seekTo(0); return }
         goingBack = true
         try { open(back.removeAt(back.size - 1)) } finally { goingBack = false }
+    }
+
+    fun cancelAutoplay() {
+        handler.removeCallbacks(autoplayGo)
+        _autoplay.value = null
+    }
+
+    fun confirmAutoplay() {
+        val n = _autoplay.value?.next
+        cancelAutoplay()
+        n?.let { open(it) }
+    }
+
+    private val autoplayGo = Runnable {
+        val n = _autoplay.value?.next
+        _autoplay.value = null
+        n?.let { open(it) }
+    }
+
+    private fun offerAutoplay() {
+        cancelAutoplay()
+        val next = Autoplay.nextAfterEnd(Prefs.autoplay, offline, live, PlayQueue.peekNext(), relatedItem()) ?: return
+        _autoplay.value = Autoplay.Offer(next, System.currentTimeMillis())
+        handler.postDelayed(autoplayGo, Autoplay.DELAY_MS)
     }
 
     private var retries = 0
@@ -182,6 +212,7 @@ object Playback {
 
     /** Start playing [item]; does nothing if it is already the current video. */
     fun open(item: VideoItem) {
+        cancelAutoplay()
         PlayQueue.onOpen(item.url)
         if (_state.value.item?.url == item.url && _state.value.error == null) return
         _state.value.item?.let { if (it.url != item.url && !goingBack) { back.add(it); if (back.size > 50) back.removeAt(0) } }
@@ -189,7 +220,7 @@ object Playback {
         loadJob?.cancel()
         retries = 0; offline = false; offlineFile = null
         player.stop(); player.clearMediaItems()
-        qualities = emptyList(); current = -1; subtitles = emptyList(); live = false
+        qualities = emptyList(); current = -1; subtitles = emptyList(); audioTracks = emptyList(); currentAudio = null; live = false
         _state.value = State(item = item, loading = true)
         History.record(item)
         runCatching { ContextCompat.startForegroundService(app, Intent(app, PlaybackService::class.java)) }
@@ -245,10 +276,12 @@ object Playback {
         val item = st.item ?: return
         current = index
         _state.value = st.copy(loading = true, error = null)
-        val textLang = player.currentTracks.groups.firstOrNull { it.type == C.TRACK_TYPE_TEXT && it.isSelected }
-            ?.let { g -> (0 until g.length).firstOrNull { g.isTrackSelected(it) }?.let { g.getTrackFormat(it).language } }
-        player.trackSelectionParameters = player.trackSelectionParameters.buildUpon()
-            .clearOverridesOfType(C.TRACK_TYPE_TEXT).setPreferredTextLanguage(textLang).build()
+        val tb = player.trackSelectionParameters.buildUpon().clearOverridesOfType(C.TRACK_TYPE_TEXT)
+        if (Prefs.ccEnabled) {
+            tb.setTrackTypeDisabled(C.TRACK_TYPE_TEXT, false)
+            Prefs.ccLanguage.trim().takeIf { it.isNotEmpty() }?.let { tb.setPreferredTextLanguage(it) }
+        } else tb.setTrackTypeDisabled(C.TRACK_TYPE_TEXT, true)
+        player.trackSelectionParameters = tb.build()
         val main = qualities[index].build()
         val subs = if (live) emptyList() else subtitles.map { s ->
             val name = runCatching { Locale.forLanguageTag(s.languageTag).getDisplayName(Locale("th")) }.getOrNull()
@@ -277,7 +310,8 @@ object Playback {
         retries = 0
         player.stop(); player.clearMediaItems()
         offline = true; offlineFile = file
-        live = false; subtitles = emptyList()
+        live = false; subtitles = emptyList(); audioTracks = emptyList(); currentAudio = null
+        cancelAutoplay()
         val factory = ProgressiveMediaSource.Factory(com.google.android.exoplayer2.upstream.DefaultDataSource.Factory(app))
         qualities = listOf(Quality("ไฟล์ที่ดาวน์โหลด", 0) { factory.createMediaSource(MediaItem.fromUri(android.net.Uri.fromFile(file))) })
         current = 0
@@ -290,9 +324,12 @@ object Playback {
     }
 
     fun close() {
+        cancelAutoplay()
         savePosition()
         back.clear()
+        PlayQueue.clear()
         offline = false; offlineFile = null
+        audioTracks = emptyList(); currentAudio = null
         loadJob?.cancel()
         player.stop(); player.clearMediaItems()
         qualities = emptyList(); current = -1
@@ -348,6 +385,21 @@ object Playback {
         return (pref.ifEmpty { audios }).maxByOrNull { if (it.averageBitrate > 0) it.averageBitrate else it.bitrate }
     }
 
+    fun setAudioTrack(id: String) {
+        val track = audioTracks.firstOrNull { it.id == id } ?: return
+        if (track.id == currentAudio?.id) return
+        currentAudio = track
+        track.language?.let { Prefs.audioLanguage = it }
+        val info = _state.value.info ?: return
+        val pos = player.currentPosition.coerceAtLeast(0)
+        val label = qualities.getOrNull(current)?.label
+        qualities = buildQualities(info)
+        if (qualities.isEmpty()) return
+        var idx = qualities.indexOfFirst { it.label == label }
+        if (idx < 0) idx = defaultIndex()
+        play(idx, pos)
+    }
+
     private fun buildQualities(info: StreamInfo): List<Quality> {
         val live = info.streamType == StreamType.LIVE_STREAM || info.streamType == StreamType.AUDIO_LIVE_STREAM
         val hls = info.hlsUrl.orEmpty()
@@ -361,7 +413,11 @@ object Playback {
         val prog = ProgressiveMediaSource.Factory(dsFactory)
         fun ok(s: org.schabi.newpipe.extractor.stream.Stream) = s.isUrl && s.deliveryMethod == DeliveryMethod.PROGRESSIVE_HTTP
         val allAudio = info.audioStreams.filter { ok(it) }
-        val audios = allAudio.filter { it.audioTrackType == null || it.audioTrackType == AudioTrackType.ORIGINAL }.ifEmpty { allAudio }
+        audioTracks = AudioTracks.groupStreams(allAudio)
+        if (currentAudio == null || audioTracks.none { it.id == currentAudio?.id }) {
+            currentAudio = AudioTracks.pick(audioTracks, Prefs.audioLanguage)
+        }
+        val audios = AudioTracks.filter(allAudio, currentAudio).ifEmpty { allAudio }
         val byHeight = LinkedHashMap<Int, Quality>()
         val videoOnly = info.videoOnlyStreams.filter { ok(it) && it.height > 0 }
         if (audios.isNotEmpty()) {

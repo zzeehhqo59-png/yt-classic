@@ -72,9 +72,35 @@ fun LinearLayout.sheetRow(icon: Int?, title: String, sub: String? = null, end: V
 
 /** ⋯ sheet under the watch page: บันทึก / ดาวน์โหลด / แชร์. */
 fun Context.videoActionSheet(v: VideoItem, download: () -> Unit) = sheet { box, dlg ->
+    if (PlayQueue.isPlayable(v)) {
+        box.sheetRow(R.drawable.ic_queue, "เล่นเป็นเพลงถัดไป") {
+            dlg.dismiss(); PlayQueue.playNext(v); Toast.makeText(this, "จะเล่นเป็นเพลงถัดไป", Toast.LENGTH_SHORT).show()
+        }
+        box.sheetRow(R.drawable.ic_queue, "เพิ่มลงในคิว") {
+            dlg.dismiss(); PlayQueue.add(v); Toast.makeText(this, "เพิ่มลงในคิวแล้ว", Toast.LENGTH_SHORT).show()
+        }
+    }
+    if (PlayQueue.extras().isNotEmpty()) {
+        box.sheetRow(R.drawable.ic_queue, "คิวเล่น", "${PlayQueue.extras().size} วิดีโอ") { dlg.dismiss(); queueSheet() }
+    }
     box.sheetRow(R.drawable.ic_bookmark_border, "บันทึก") { dlg.dismiss(); saveToPlaylist(v) }
     if (!v.live && !v.upcoming) box.sheetRow(R.drawable.ic_download, "ดาวน์โหลด") { dlg.dismiss(); download() }
     box.sheetRow(R.drawable.ic_share, "แชร์") { dlg.dismiss(); shareUrl(v.url) }
+}
+
+/** Videos waiting after the current one (user "เพิ่มลงในคิว" / "เล่นเป็นเพลงถัดไป"). */
+fun Context.queueSheet() = sheet { box, dlg ->
+    box.sheetTitle("คิวเล่น")
+    val list = PlayQueue.extras()
+    if (list.isEmpty()) {
+        box.sheetRow(null, "คิวว่าง") { dlg.dismiss() }
+        return@sheet
+    }
+    list.forEach { v ->
+        box.sheetRow(R.drawable.ic_queue, v.title, v.channel) {
+            dlg.dismiss(); PlayQueue.removeExtra(v.url); PlayQueue.playNext(v); openVideo(v)
+        }
+    }
 }
 
 /** Single-choice list in a sheet (quality, speed, captions); the chosen one gets a ✓. */
