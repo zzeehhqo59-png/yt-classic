@@ -122,6 +122,20 @@ object History {
         buildMap { while (c.moveToNext()) put(c.getString(0), (c.getLong(1) * 1000 / c.getLong(2)).toInt().coerceIn(0, 1000)) }
     }
 
+    fun marks(urls: List<String>): List<SeriesSeasons.WatchMark> {
+        if (urls.isEmpty()) return emptyList()
+        return urls.chunked(500).flatMap { part ->
+            Db.r.rawQuery(
+                "SELECT url, position_ms, length_ms, watched_at FROM history WHERE url IN (${part.joinToString(",") { "?" }})",
+                part.toTypedArray(),
+            ).use { c ->
+                buildList {
+                    while (c.moveToNext()) add(SeriesSeasons.WatchMark(c.getString(0), c.getLong(1), c.getLong(2), c.getLong(3)))
+                }
+            }
+        }
+    }
+
     data class Entry(val video: VideoItem, val watchedAt: Long, val count: Int)
 
     fun recent(limit: Int = 500): List<Entry> =

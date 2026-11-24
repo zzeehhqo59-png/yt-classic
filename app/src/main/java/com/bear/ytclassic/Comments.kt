@@ -15,6 +15,7 @@ import com.google.android.material.bottomsheet.BottomSheetDialog
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.MainScope
+import java.lang.ref.WeakReference
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -31,8 +32,13 @@ fun commentText(c: CommentsInfoItem): CharSequence {
 fun commentPlain(c: CommentsInfoItem): String = commentText(c).toString().replace('\n', ' ')
 
 /** Read-only comments in a bottom sheet under the player: infinite scroll, replies expand in place. */
+private var commentsSheet: WeakReference<BottomSheetDialog>? = null
+
+fun dismissCommentsSheet() { commentsSheet?.get()?.dismiss(); commentsSheet = null }
+
 fun showCommentsSheet(c: Context, info: CommentsInfo, topPx: Int) {
     val dlg = BottomSheetDialog(c)
+    commentsSheet = WeakReference(dlg)
     val v = LayoutInflater.from(c).inflate(R.layout.sheet_comments, null)
     val height = c.resources.displayMetrics.heightPixels - topPx
     v.layoutParams = ViewGroup.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, height)
@@ -40,7 +46,7 @@ fun showCommentsSheet(c: Context, info: CommentsInfo, topPx: Int) {
     dlg.window?.setDimAmount(0.25f)
     dlg.behavior.apply { peekHeight = height; state = BottomSheetBehavior.STATE_EXPANDED; skipCollapsed = true }
     val scope = MainScope()
-    dlg.setOnDismissListener { scope.cancel() }
+    dlg.setOnDismissListener { scope.cancel(); if (commentsSheet?.get() === dlg) commentsSheet = null }
     v.findViewById<View>(R.id.sheetClose).setOnClickListener { dlg.dismiss() }
     if (info.commentsCount >= 0) v.findViewById<TextView>(R.id.sheetTitle).text = "ความคิดเห็น  " + Fmt.shortNum(info.commentsCount.toLong())
     val progress = v.findViewById<View>(R.id.commentProgress)

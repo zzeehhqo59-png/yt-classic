@@ -36,24 +36,9 @@ class WatchViewModel : ViewModel() {
      * @return the item to show and how the page should bind, or null if there is nothing to show
      */
     /** Decide how to open without touching the player yet, so the Activity can reset the UI first. */
-    fun planOpen(item: VideoItem?, file: File?): Pair<VideoItem, OpenKind>? {
-        val v = item ?: Playback.state.value.item ?: return null
-        val kind = when {
-            file != null && (Playback.state.value.item?.url != v.url || !Playback.offline) -> OpenKind.NewFile
-            file != null -> OpenKind.Unchanged
-            Playback.state.value.item?.url == v.url -> OpenKind.Reuse
-            else -> OpenKind.NewStream
-        }
-        return v to kind
-    }
+    fun planOpen(item: VideoItem?, file: File?): Pair<VideoItem, OpenKind>? = WatchOpen.planOpen(item, file)
 
-    fun applyOpen(item: VideoItem, file: File?, kind: OpenKind) {
-        when (kind) {
-            OpenKind.NewFile -> Playback.openFile(item, file!!)
-            OpenKind.NewStream -> Playback.open(item)
-            OpenKind.Reuse, OpenKind.Unchanged -> {}
-        }
-    }
+    fun applyOpen(item: VideoItem, file: File?, kind: OpenKind) = WatchOpen.applyOpen(item, file, kind)
 
     /** Toggle 👍 / 👎 and return the toast to show. */
     fun rate(item: VideoItem, value: Int): String {
@@ -63,4 +48,25 @@ class WatchViewModel : ViewModel() {
 
     fun downloadInfo(item: VideoItem): StreamInfo? =
         Playback.state.value.info?.takeIf { it.url == item.url || Playback.state.value.item?.url == item.url }
+}
+
+object WatchOpen {
+    fun planOpen(item: VideoItem?, file: File?): Pair<VideoItem, WatchViewModel.OpenKind>? {
+        val v = item ?: Playback.state.value.item ?: return null
+        val kind = when {
+            file != null && (Playback.state.value.item?.url != v.url || !Playback.offline) -> WatchViewModel.OpenKind.NewFile
+            file != null -> WatchViewModel.OpenKind.Unchanged
+            Playback.state.value.item?.url == v.url -> WatchViewModel.OpenKind.Reuse
+            else -> WatchViewModel.OpenKind.NewStream
+        }
+        return v to kind
+    }
+
+    fun applyOpen(item: VideoItem, file: File?, kind: WatchViewModel.OpenKind) {
+        when (kind) {
+            WatchViewModel.OpenKind.NewFile -> if (file != null) Playback.openFile(item, file)
+            WatchViewModel.OpenKind.NewStream -> Playback.open(item)
+            WatchViewModel.OpenKind.Reuse, WatchViewModel.OpenKind.Unchanged -> {}
+        }
+    }
 }

@@ -1,0 +1,16 @@
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android" android:layout_width="match_parent" android:layout_height="wrap_content"
+    android:orientation="horizontal" android:gravity="center_vertical" android:paddingStart="16dp" android:paddingEnd="8dp" android:paddingTop="10dp" android:paddingBottom="10dp"
+    android:background="?attr/selectableItemBackground">
+  <FrameLayout android:layout_width="140dp" android:layout_height="78dp">
+    <ImageView android:id="@+id/thumb" android:layout_width="match_parent" android:layout_height="match_parent" android:scaleType="centerCrop" android:background="@color/placeholder" android:importantForAccessibility="no"/>
+    <TextView android:id="@+id/duration" android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_gravity="bottom|end" android:layout_margin="4dp"
+        android:paddingStart="4dp" android:paddingEnd="4dp" android:textColor="#FFFFFF" android:textSize="11sp" android:background="@drawable/bg_duration"/>
+    <ProgressBar android:id="@+id/watched" style="?android:attr/progressBarStyleHorizontal" android:layout_width="match_parent" android:layout_height="3dp"
+        android:layout_gravity="bottom" android:progressTint="#FF0000" android:progressBackgroundTint="#80FFFFFF" android:max="1000" android:visibility="gone"/>
+  </FrameLayout>
+  <LinearLayout android:layout_width="0dp" android:layout_weight="1" android:layout_height="wrap_content" android:orientation="vertical" android:layout_marginStart="12dp">
+    <TextView android:id="@+id/epLabel" android:layout_width="match_parent" android:layout_height="wrap_content" android:textColor="@color/text2" android:textSize="12sp"/>
+    <TextView android:id="@+id/title" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="2dp" android:textColor="@color/text1" android:textSize="14sp" android:maxLines="2" android:ellipsize="end"/>
+  </LinearLayout>
+  <ImageButton android:id="@+id/more" android:layout_width="40dp" android:layout_height="40dp" android:background="?attr/selectableItemBackgroundBorderless" android:src="@drawable/ic_more_vert" android:contentDescription="@string/more" android:padding="8dp"/>
+</LinearLayout>

@@ -8,6 +8,7 @@ import android.content.pm.ServiceInfo
 import android.graphics.Bitmap
 import android.os.Build
 import android.os.IBinder
+import android.net.wifi.WifiManager
 import android.support.v4.media.session.MediaSessionCompat
 import androidx.core.app.ServiceCompat
 import coil3.imageLoader
@@ -26,11 +27,14 @@ class PlaybackService : Service() {
     private var foreground = false
     private var iconUrl: String? = null
     private var icon: Bitmap? = null
+    private var wifiLock: WifiManager.WifiLock? = null
 
     override fun onBind(intent: Intent?): IBinder? = null
 
     override fun onCreate() {
         super.onCreate()
+        val wm = applicationContext.getSystemService(WIFI_SERVICE) as WifiManager
+        wifiLock = wm.createWifiLock(WifiManager.WIFI_MODE_FULL_HIGH_PERF, "ytclassic").also { it.setReferenceCounted(false); it.acquire() }
         session = MediaSessionCompat(this, "ytclassic").apply { isActive = true }
         connector = MediaSessionConnector(session).apply {
             setPlayer(Playback.player)
@@ -51,8 +55,8 @@ class PlaybackService : Service() {
                 override fun getCurrentContentTitle(player: Player): CharSequence = Playback.state.value.item?.title ?: getString(R.string.app_name)
                 override fun getCurrentContentText(player: Player): CharSequence? = Playback.state.value.item?.channel
                 override fun createCurrentContentIntent(player: Player): PendingIntent =
-                    PendingIntent.getActivity(this@PlaybackService, 0,
-                        Intent(this@PlaybackService, WatchActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
+                    PendingIntent.getBroadcast(this@PlaybackService, 0,
+                        Intent(this@PlaybackService, PlayerOpenReceiver::class.java),
                         PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
                 override fun getCurrentLargeIcon(player: Player, callback: PlayerNotificationManager.BitmapCallback): Bitmap? {
                     val url = Playback.state.value.item?.thumb ?: return null
@@ -103,7 +107,7 @@ class PlaybackService : Service() {
             .setContentTitle(Playback.state.value.item?.title ?: getString(R.string.app_name)).setSilent(true).build()
         ServiceCompat.startForeground(this, 1001, n, if (Build.VERSION.SDK_INT >= 29) ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PLAYBACK else 0)
         foreground = true
-        return START_NOT_STICKY
+        return START_STICKY
     }
 
     override fun onTaskRemoved(rootIntent: Intent?) {
@@ -114,6 +118,8 @@ class PlaybackService : Service() {
         notif.setPlayer(null)
         connector.setPlayer(null)
         session.release()
+        wifiLock?.let { if (it.isHeld) it.release() }
+        wifiLock = null
         super.onDestroy()
     }
 }

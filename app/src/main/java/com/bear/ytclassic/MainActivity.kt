@@ -15,7 +15,6 @@ import com.google.android.exoplayer2.Player
 import com.google.android.exoplayer2.ui.StyledPlayerView
 import android.widget.TextView
 import android.widget.Toast
-import androidx.appcompat.app.AppCompatActivity
 import androidx.fragment.app.Fragment
 import androidx.lifecycle.lifecycleScope
 import androidx.recyclerview.widget.LinearLayoutManager
@@ -25,7 +24,7 @@ import com.google.android.material.bottomnavigation.BottomNavigationView
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 
-class MainActivity : AppCompatActivity() {
+class MainActivity : YtActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         edgeToEdge(lightBars = true)
@@ -37,19 +36,20 @@ class MainActivity : AppCompatActivity() {
         findViewById<ImageButton>(R.id.btnAccount).setOnClickListener {
             startActivity(Intent(this, SettingsActivity::class.java))
         }
-        MiniPlayerBar.attach(this)
+        attachPlayerUi()
         val nav = findViewById<BottomNavigationView>(R.id.bottomNav)
         nav.setOnItemSelectedListener { show(it.itemId); true }
         nav.setOnItemReselectedListener { if (it.itemId == R.id.nav_home) (supportFragmentManager.findFragmentByTag("home") as? HomeFragment)?.scrollTop() }
         if (savedInstanceState == null) show(R.id.nav_home)
         handleTab(intent)
+        WatchNav.consumeIntent(this, intent)
         lifecycleScope.launch {
             val n = Subs.importOldAppOnce(applicationContext)
             if (n != null && n > 0) Toast.makeText(this@MainActivity, "นำเข้าช่องที่ติดตามจากแอปเดิมแล้ว $n ช่อง", Toast.LENGTH_LONG).show()
         }
     }
 
-    override fun onNewIntent(intent: Intent) { super.onNewIntent(intent); handleTab(intent) }
+    override fun onNewIntent(intent: Intent) { super.onNewIntent(intent); handleTab(intent); WatchNav.consumeIntent(this, intent) }
 
     /** Download notifications open คลังวิดีโอ. */
     private fun handleTab(i: Intent?) {
@@ -76,15 +76,11 @@ class MainActivity : AppCompatActivity() {
 fun android.content.Context.openDownloaded(d: Downloads.Dl) {
     val f = d.file?.let { java.io.File(it) }
     if (f == null || !f.exists()) { Toast.makeText(this, "ไม่พบไฟล์ที่ดาวน์โหลดไว้ (อาจถูกลบไปแล้ว)", Toast.LENGTH_SHORT).show(); return }
-    startActivityNoTransition(Intent(this, WatchActivity::class.java).putExtra(WatchActivity.EXTRA_ITEM, d.video()).putExtra(WatchActivity.EXTRA_FILE, f.path)
-        .addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP))
+    WatchNav.open(this, d.video(), file = f)
 }
 
 fun android.content.Context.openVideo(v: VideoItem, expandFrom: Float = -1f) {
-    val i = Intent(this, WatchActivity::class.java).putExtra(WatchActivity.EXTRA_ITEM, v)
-        .addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP)
-    if (expandFrom > 0f) i.putExtra(WatchActivity.EXTRA_EXPAND_FROM, expandFrom)
-    startActivityNoTransition(i)
+    WatchNav.open(this, v, expandFrom = expandFrom)
 }
 
 class HomeFragment : Fragment() {

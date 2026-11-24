@@ -85,10 +85,15 @@ object Playback {
                 p.addListener(object : Player.Listener {
                     override fun onPlayerError(error: PlaybackException) {
                         savePosition()
-                        // stream URLs expire / get throttled (typically after the app sat in the background): fetch fresh ones and continue
-                        val sourceError = error.errorCode in 2000..3999
                         if (offline) { _state.value = _state.value.copy(loading = false, error = "เล่นไฟล์ที่ดาวน์โหลดไว้ไม่ได้\n(ไฟล์อาจถูกลบหรือเสียหาย)"); return }
-                        if (sourceError && retries < 2 && _state.value.item != null) { retries++; lastRetryAt = System.currentTimeMillis(); refetch(); return }
+                        if (StreamRecovery.shouldRetry(error.errorCode, retries, offline) && _state.value.item != null) {
+                            retries++
+                            lastRetryAt = System.currentTimeMillis()
+                            _state.value = _state.value.copy(loading = true, error = null)
+                            handler.removeCallbacks(recoverGo)
+                            handler.postDelayed(recoverGo, StreamRecovery.delayMs(retries))
+                            return
+                        }
                         _state.value = _state.value.copy(loading = false, error = "เล่นวิดีโอไม่ได้ ลองเลือกคุณภาพอื่น\n(${error.errorCodeName})")
                     }
                     override fun onPlaybackStateChanged(s: Int) {
@@ -111,7 +116,20 @@ object Playback {
         override fun run() { savePosition(); if (player.isPlaying) handler.postDelayed(this, 5000) }
     }
 
-    fun init(c: Context) { app = c.applicationContext }
+    private val recoverGo = Runnable { refetch() }
+
+    fun init(c: Context) {
+        app = c.applicationContext
+        NetworkWatch(app) { recoverIfNeeded() }.start()
+    }
+
+    fun recoverIfNeeded() {
+        val st = _state.value
+        val idle = player.playbackState == Player.STATE_IDLE
+        if (!StreamRecovery.shouldRefetchOnNetworkRestore(st.item != null, offline, st.error != null, player.playWhenReady, idle)) return
+        retries = 0
+        refetch()
+    }
 
     // ---- previous / next (old-app buttons) ----
     /** Videos watched before the current one in this session (for ⏮). */
@@ -170,6 +188,7 @@ object Playback {
         val attempt = retries
         loadJob?.cancel()
         _state.value = _state.value.copy(loading = true, error = null)
+        runCatching { ContextCompat.startForegroundService(app, Intent(app, PlaybackService::class.java)) }
         loadJob = scope.launch {
             try {
                 val info = Repo.stream(item.url)
@@ -257,7 +276,7 @@ object Playback {
             } catch (e: CancellationException) { throw e
             } catch (e: Throwable) {
                 _state.value = _state.value.copy(loading = false, error = Errors.video(e, item))
-                app.stopService(Intent(app, PlaybackService::class.java))
+                if (!StreamRecovery.isNetworkFailure(e)) app.stopService(Intent(app, PlaybackService::class.java))
                 onUnavailable(item, Availability.kindFromError(e))
             }
         }

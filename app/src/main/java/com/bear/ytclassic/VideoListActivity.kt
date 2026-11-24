@@ -8,7 +8,6 @@ import android.widget.PopupMenu
 import android.widget.TextView
 import android.widget.Toast
 import androidx.appcompat.app.AlertDialog
-import androidx.appcompat.app.AppCompatActivity
 import androidx.lifecycle.lifecycleScope
 import androidx.recyclerview.widget.ConcatAdapter
 import androidx.recyclerview.widget.LinearLayoutManager
@@ -20,7 +19,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
 /** Watch history, liked videos, a local playlist (incl. ดูภายหลัง) or a YouTube playlist. */
-class VideoListActivity : AppCompatActivity() {
+class VideoListActivity : YtActivity() {
     companion object {
         fun history(c: Context) = Intent(c, VideoListActivity::class.java).putExtra("mode", "history")
         fun local(c: Context, id: Long) = Intent(c, VideoListActivity::class.java).putExtra("mode", "local").putExtra("id", id)
@@ -45,13 +44,13 @@ class VideoListActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
         edgeToEdge(lightBars = true)
         setContentView(R.layout.activity_list)
-        MiniPlayerBar.attach(this)
+        attachPlayerUi()
         findViewById<View>(R.id.root).padForSystemBars()
         mode = intent.getStringExtra("mode") ?: "history"
         plId = intent.getLongExtra("id", 0)
         message = findViewById(R.id.message)
         progress = findViewById(R.id.progress)
-        findViewById<View>(R.id.btnBack).setOnClickListener { finish() }
+        findViewById<View>(R.id.btnBack).setOnClickListener { if (!WatchLayer.consumeBack(this)) finish() }
         adapter = VideoAdapter(false, onMore = { v, item -> moreFor(v, item) }, canHide = mode == "history") { v ->
             if (mode == "history") openVideo(v) else playFrom(adapter.items.indexOfFirst { it.url == v.url })
         }

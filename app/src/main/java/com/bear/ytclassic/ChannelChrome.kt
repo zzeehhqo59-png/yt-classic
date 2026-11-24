@@ -24,8 +24,12 @@ class ChannelHeaderAdapter(
         LayoutInflater.from(parent.context).inflate(R.layout.item_channel_header, parent, false)
     ) {}
     override fun onBindViewHolder(h: RecyclerView.ViewHolder, position: Int) {
-        val v = h.itemView
-        val st = state()
+        h.itemView.bindChannelHeader(state(), onAbout)
+    }
+}
+
+fun View.bindChannelHeader(st: ChannelUiState, onAbout: () -> Unit) {
+        val v = this
         val c = st.channel
         v.findViewById<ImageView>(R.id.banner).apply {
             if (st.banner != null) { visibility = View.VISIBLE; load(st.banner) } else visibility = View.GONE
@@ -56,7 +60,6 @@ class ChannelHeaderAdapter(
             more.setOnClickListener { onAbout() }
             desc.setOnClickListener { onAbout() }
         }
-    }
 }
 
 /** Horizontally scrolling channel tabs; only tabs present in [ChannelUiState.tabs]. */

@@ -20,7 +20,7 @@ import org.schabi.newpipe.extractor.stream.StreamInfo
  * captions / speed / quality sheets, landscape bottom row and double-tap seeking.
  * The page itself (layout, mini player, PiP) stays in [WatchActivity] and is reached through [Host].
  */
-class WatchControls(private val a: AppCompatActivity, private val playerView: StyledPlayerView, private val playerBox: View, private val host: Host) {
+class WatchControls(private val a: AppCompatActivity, private val root: View, private val playerView: StyledPlayerView, private val playerBox: View, private val host: Host) {
     interface Host {
         val inPip: Boolean
         /** The page is being dragged / animated into the mini player. */
@@ -94,21 +94,21 @@ class WatchControls(private val a: AppCompatActivity, private val playerView: St
     private fun speedLabel(f: Float) = if (f == 1f) "ปกติ" else (if (f % 1f == 0f) "${f.toInt()}" else "$f") + "x"
 
     fun setup() {
-        seekLeft = a.findViewById(R.id.seekLeft)
-        seekRight = a.findViewById(R.id.seekRight)
-        controls = a.findViewById(R.id.controls)
-        seek = a.findViewById(R.id.seek)
-        btnPlay = a.findViewById(R.id.btnPlay)
-        btnPrev = a.findViewById(R.id.btnPrev)
-        btnNext = a.findViewById(R.id.btnNext)
-        btnCC = a.findViewById(R.id.btnCC)
-        btnFull = a.findViewById(R.id.btnFull)
-        btnAutoplay = a.findViewById(R.id.btnAutoplay)
-        timePill = a.findViewById(R.id.timePill)
-        previewBox = a.findViewById(R.id.previewBox)
-        previewImg = a.findViewById(R.id.previewImg)
-        previewPill = a.findViewById(R.id.previewPill)
-        centerRow = a.findViewById(R.id.centerRow)
+        seekLeft = root.findViewById(R.id.seekLeft)
+        seekRight = root.findViewById(R.id.seekRight)
+        controls = root.findViewById(R.id.controls)
+        seek = root.findViewById(R.id.seek)
+        btnPlay = root.findViewById(R.id.btnPlay)
+        btnPrev = root.findViewById(R.id.btnPrev)
+        btnNext = root.findViewById(R.id.btnNext)
+        btnCC = root.findViewById(R.id.btnCC)
+        btnFull = root.findViewById(R.id.btnFull)
+        btnAutoplay = root.findViewById(R.id.btnAutoplay)
+        timePill = root.findViewById(R.id.timePill)
+        previewBox = root.findViewById(R.id.previewBox)
+        previewImg = root.findViewById(R.id.previewImg)
+        previewPill = root.findViewById(R.id.previewPill)
+        centerRow = root.findViewById(R.id.centerRow)
         btnPlay.setOnClickListener {
             when {
                 player.playbackState == Player.STATE_ENDED -> { Playback.cancelAutoplay(); player.seekTo(0); player.play() }
@@ -127,28 +127,28 @@ class WatchControls(private val a: AppCompatActivity, private val playerView: St
             Toast.makeText(a, if (Prefs.autoplay) "เปิดเล่นอัตโนมัติแล้ว" else "ปิดเล่นอัตโนมัติแล้ว", Toast.LENGTH_SHORT).show(); scheduleHide()
         }
         btnCC.setOnClickListener { tracks.toggle(); updateCC(); scheduleHide() }
-        a.findViewById<View>(R.id.btnSettings).setOnClickListener { settingsSheet() }
+        root.findViewById<View>(R.id.btnSettings).setOnClickListener { settingsSheet() }
         btnFull.setOnClickListener { host.toggleFullscreen() }
-        a.findViewById<View>(R.id.btnBack).setOnClickListener { host.toggleFullscreen() }
+        root.findViewById<View>(R.id.btnBack).setOnClickListener { host.toggleFullscreen() }
         // landscape bottom row
-        a.findViewById<View>(R.id.landComments).setOnClickListener { host.openComments() }
-        a.findViewById<View>(R.id.landLike).setOnClickListener { host.rate(Likes.LIKE); scheduleHide() }
-        a.findViewById<View>(R.id.landDislike).setOnClickListener { host.rate(Likes.DISLIKE); scheduleHide() }
-        a.findViewById<View>(R.id.landShare).setOnClickListener { host.share() }
-        a.findViewById<View>(R.id.landMore).setOnClickListener { host.moreSheet() }
-        a.findViewById<View>(R.id.landNext).setOnClickListener { Playback.next() }
+        root.findViewById<View>(R.id.landComments).setOnClickListener { host.openComments() }
+        root.findViewById<View>(R.id.landLike).setOnClickListener { host.rate(Likes.LIKE); scheduleHide() }
+        root.findViewById<View>(R.id.landDislike).setOnClickListener { host.rate(Likes.DISLIKE); scheduleHide() }
+        root.findViewById<View>(R.id.landShare).setOnClickListener { host.share() }
+        root.findViewById<View>(R.id.landMore).setOnClickListener { host.moreSheet() }
+        root.findViewById<View>(R.id.landNext).setOnClickListener { Playback.next() }
         seek.listener = object : YtSeekBar.Listener {
             override fun onScrubStart(pos: Long) {
                 playerView.removeCallbacks(hideCtl)
                 centerRow.animate().alpha(0f).setDuration(120).start()
-                a.findViewById<View>(R.id.bottomBar).alpha = 0f
+                root.findViewById<View>(R.id.bottomBar).alpha = 0f
                 previewBox.visibility = View.VISIBLE
             }
             override fun onScrubMove(pos: Long, x: Float) = showPreview(pos, x)
             override fun onScrubStop(pos: Long, cancelled: Boolean) {
                 if (!cancelled) player.seekTo(pos)
                 previewBox.visibility = View.GONE
-                a.findViewById<View>(R.id.bottomBar).alpha = 1f
+                root.findViewById<View>(R.id.bottomBar).alpha = 1f
                 centerRow.animate().alpha(1f).setDuration(120).start()
                 updateTime(); scheduleHide()
             }
@@ -177,10 +177,10 @@ class WatchControls(private val a: AppCompatActivity, private val playerView: St
 
     fun layout(land: Boolean) {
         val g = if (land) View.VISIBLE else View.GONE
-        a.findViewById<View>(R.id.btnBack).visibility = g
-        a.findViewById<View>(R.id.titleBox).visibility = g
-        a.findViewById<View>(R.id.topSpacer).visibility = if (land) View.GONE else View.VISIBLE
-        a.findViewById<View>(R.id.landRow).visibility = g
+        root.findViewById<View>(R.id.btnBack).visibility = g
+        root.findViewById<View>(R.id.titleBox).visibility = g
+        root.findViewById<View>(R.id.topSpacer).visibility = if (land) View.GONE else View.VISIBLE
+        root.findViewById<View>(R.id.landRow).visibility = g
         btnFull.setImageResource(if (land) R.drawable.ic_fullscreen_exit else R.drawable.ic_fullscreen)
         btnFull.contentDescription = if (land) "ออกจากโหมดเต็มหน้าจอ" else "เต็มหน้าจอ"
         val rowH = dp(80f).toInt()
@@ -190,8 +190,8 @@ class WatchControls(private val a: AppCompatActivity, private val playerView: St
         // portrait: the bar line sits on the video's bottom edge, the knob may overhang it
         seek.lineFromBottom = if (land) dp(14f) else dp(10f)
         seek.translationY = if (land) 0f else dp(9f)
-        (a.findViewById<View>(R.id.bottomBar).layoutParams as FrameLayout.LayoutParams).let {
-            it.bottomMargin = if (land) rowH + dp(26f).toInt() else dp(14f).toInt(); a.findViewById<View>(R.id.bottomBar).layoutParams = it
+        (root.findViewById<View>(R.id.bottomBar).layoutParams as FrameLayout.LayoutParams).let {
+            it.bottomMargin = if (land) rowH + dp(26f).toInt() else dp(14f).toInt(); root.findViewById<View>(R.id.bottomBar).layoutParams = it
         }
         val pw = dp(if (land) 200f else 144f).toInt()
         previewImg.layoutParams = previewImg.layoutParams.apply { width = pw; height = pw * 9 / 16 }
@@ -294,10 +294,10 @@ class WatchControls(private val a: AppCompatActivity, private val playerView: St
 
     /** Landscape: first-comment card at the bottom left. */
     fun updateLandComments(title: String?, preview: String?, avatar: String?) {
-        a.findViewById<View>(R.id.landComments).visibility = if (title == null) View.INVISIBLE else View.VISIBLE
-        a.findViewById<TextView>(R.id.landCommentsTitle).text = title
-        a.findViewById<TextView>(R.id.landCommentText).text = preview
-        a.findViewById<ImageView>(R.id.landCommentAvatar).apply { visibility = if (avatar == null) View.GONE else View.VISIBLE; loadAvatar(avatar) }
+        root.findViewById<View>(R.id.landComments).visibility = if (title == null) View.INVISIBLE else View.VISIBLE
+        root.findViewById<TextView>(R.id.landCommentsTitle).text = title
+        root.findViewById<TextView>(R.id.landCommentText).text = preview
+        root.findViewById<ImageView>(R.id.landCommentAvatar).apply { visibility = if (avatar == null) View.GONE else View.VISIBLE; loadAvatar(avatar) }
     }
 
 
@@ -344,12 +344,12 @@ class WatchControls(private val a: AppCompatActivity, private val playerView: St
 
     /** Landscape title row and the up-next button for the current video. */
     fun renderItem(it: VideoItem) {
-        a.findViewById<TextView>(R.id.landTitle).text = it.title
-        a.findViewById<TextView>(R.id.landChannel).text = it.channel
+        root.findViewById<TextView>(R.id.landTitle).text = it.title
+        root.findViewById<TextView>(R.id.landChannel).text = it.channel
         val nxt = Playback.nextItem()
         btnNext.alpha = if (nxt != null) 1f else 0.4f
-        a.findViewById<View>(R.id.landNext).visibility = if (nxt != null) View.VISIBLE else View.INVISIBLE
-        nxt?.thumb?.let { u -> a.findViewById<ImageView>(R.id.landNextThumb).load(u) }
+        root.findViewById<View>(R.id.landNext).visibility = if (nxt != null) View.VISIBLE else View.INVISIBLE
+        nxt?.thumb?.let { u -> root.findViewById<ImageView>(R.id.landNextThumb).load(u) }
         updateRating()
         updatePlayButton(); updateTime()
     }
@@ -357,8 +357,8 @@ class WatchControls(private val a: AppCompatActivity, private val playerView: St
     /** Landscape 👍 / 👎 follow the local rating. */
     fun updateRating() {
         val r = host.rating()
-        a.findViewById<ImageView>(R.id.landLike).setColorFilter(rateColor(a, r == Likes.LIKE, android.R.color.white))
-        a.findViewById<ImageView>(R.id.landDislike).setColorFilter(rateColor(a, r == Likes.DISLIKE, android.R.color.white))
+        root.findViewById<ImageView>(R.id.landLike).setColorFilter(rateColor(a, r == Likes.LIKE, android.R.color.white))
+        root.findViewById<ImageView>(R.id.landDislike).setColorFilter(rateColor(a, r == Likes.DISLIKE, android.R.color.white))
     }
 
     fun attach() {

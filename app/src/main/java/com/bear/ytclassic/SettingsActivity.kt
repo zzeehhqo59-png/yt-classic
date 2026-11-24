@@ -9,12 +9,11 @@ import android.widget.LinearLayout
 import android.widget.TextView
 import android.widget.Toast
 import androidx.appcompat.app.AlertDialog
-import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
 import com.google.android.material.switchmaterial.SwitchMaterial
 
 /** Settings in the style of the classic YouTube Android app: grouped sections, title + summary rows, switches on the right. */
-class SettingsActivity : AppCompatActivity() {
+class SettingsActivity : YtActivity() {
     private lateinit var list: LinearLayout
     private val d get() = resources.displayMetrics.density
     private fun px(v: Int) = (v * d).toInt()
@@ -24,9 +23,9 @@ class SettingsActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
         edgeToEdge(lightBars = true)
         setContentView(R.layout.activity_settings)
-        MiniPlayerBar.attach(this)
+        attachPlayerUi()
         findViewById<View>(R.id.root).padForSystemBars()
-        findViewById<View>(R.id.btnBack).setOnClickListener { finish() }
+        findViewById<View>(R.id.btnBack).setOnClickListener { if (!WatchLayer.consumeBack(this)) finish() }
         list = findViewById(R.id.list)
         build()
     }

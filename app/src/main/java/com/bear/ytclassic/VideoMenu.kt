@@ -13,7 +13,7 @@ import androidx.appcompat.app.AlertDialog
 /** Opens a list item: video -> watch page, channel -> channel page, playlist -> playlist page. */
 fun Context.openItem(v: VideoItem) = when (v.kind) {
     1 -> openChannel(v.url, v.title, v.avatar)
-    2 -> startActivity(VideoListActivity.remote(this, v.url, v.title))
+    2 -> startActivity(SeriesActivity.intent(this, v.url, v.title, v.channelUrl))
     else -> openVideo(v)
 }
 

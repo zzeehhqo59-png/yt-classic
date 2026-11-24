@@ -1,0 +1,15 @@
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android" android:id="@+id/root" android:layout_width="match_parent" android:layout_height="match_parent"
+    android:orientation="vertical" android:background="@color/bg">
+  <LinearLayout android:layout_width="match_parent" android:layout_height="48dp" android:orientation="horizontal" android:gravity="center_vertical" android:background="@color/bg" android:elevation="4dp">
+    <ImageButton android:id="@+id/btnBack" android:layout_width="48dp" android:layout_height="48dp" android:background="?attr/selectableItemBackgroundBorderless" android:src="@drawable/ic_back" android:contentDescription="@string/back"/>
+    <TextView android:id="@+id/barTitle" android:layout_width="0dp" android:layout_weight="1" android:layout_height="wrap_content" android:layout_marginStart="8dp"
+        android:maxLines="1" android:ellipsize="end" android:textColor="@color/text1" android:textSize="18sp"/>
+  </LinearLayout>
+  <FrameLayout android:layout_width="match_parent" android:layout_height="0dp" android:layout_weight="1">
+    <androidx.recyclerview.widget.RecyclerView android:id="@+id/list" android:layout_width="match_parent" android:layout_height="match_parent"/>
+    <ProgressBar android:id="@+id/progress" android:layout_width="40dp" android:layout_height="40dp" android:layout_gravity="center" android:indeterminateTint="#FF0000" android:visibility="gone"/>
+    <TextView android:id="@+id/message" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_gravity="center" android:gravity="center"
+        android:padding="24dp" android:textColor="@color/text2" android:textSize="15sp" android:visibility="gone"/>
+  </FrameLayout>
+  <include layout="@layout/view_mini_bar"/>
+</LinearLayout>

@@ -1,4 +1,5 @@
-<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android" android:id="@+id/root" android:layout_width="match_parent" android:layout_height="match_parent"
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android" xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:id="@+id/root" android:layout_width="match_parent" android:layout_height="match_parent"
     android:orientation="vertical" android:background="@color/bg">
   <LinearLayout android:layout_width="match_parent" android:layout_height="48dp" android:orientation="horizontal" android:gravity="center_vertical" android:background="@color/bg" android:elevation="4dp">
     <ImageButton android:id="@+id/btnBack" android:layout_width="48dp" android:layout_height="48dp" android:background="?attr/selectableItemBackgroundBorderless" android:src="@drawable/ic_back" android:contentDescription="@string/back"/>
@@ -6,8 +7,17 @@
         android:maxLines="1" android:ellipsize="end" android:textColor="@color/text1" android:textSize="18sp"/>
     <ImageButton android:id="@+id/btnSearch" android:layout_width="48dp" android:layout_height="48dp" android:background="?attr/selectableItemBackgroundBorderless" android:src="@drawable/ic_search" android:contentDescription="@string/search"/>
   </LinearLayout>
+  <include android:id="@+id/header" layout="@layout/item_channel_header" android:layout_width="match_parent" android:layout_height="wrap_content"/>
+  <com.google.android.material.tabs.TabLayout
+      android:id="@+id/tabLayout"
+      android:layout_width="match_parent" android:layout_height="44dp"
+      android:background="@color/bg"
+      app:tabMode="scrollable" app:tabGravity="start" app:tabIndicatorFullWidth="false"
+      app:tabIndicatorColor="#FF0000" app:tabIndicatorHeight="3dp"
+      app:tabSelectedTextColor="@color/text1" app:tabTextColor="@color/text2"
+      app:tabRippleColor="@color/chip_bg" app:tabPaddingStart="12dp" app:tabPaddingEnd="12dp"/>
   <FrameLayout android:layout_width="match_parent" android:layout_height="0dp" android:layout_weight="1">
-    <androidx.recyclerview.widget.RecyclerView android:id="@+id/list" android:layout_width="match_parent" android:layout_height="match_parent"/>
+    <androidx.viewpager2.widget.ViewPager2 android:id="@+id/pager" android:layout_width="match_parent" android:layout_height="match_parent"/>
     <ProgressBar android:id="@+id/progress" android:layout_width="40dp" android:layout_height="40dp" android:layout_gravity="center" android:indeterminateTint="#FF0000" android:visibility="gone"/>
     <TextView android:id="@+id/message" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_gravity="center" android:gravity="center"
         android:padding="24dp" android:textColor="@color/text2" android:textSize="15sp" android:visibility="gone"/>

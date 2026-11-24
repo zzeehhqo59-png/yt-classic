@@ -18,8 +18,8 @@ android {
         applicationId = "com.bear.ytclassic"
         minSdk = 23
         targetSdk = 35
-        versionCode = 7001
-        versionName = "6.0.1"
+        versionCode = 7002
+        versionName = "6.0.2"
     }
 
     signingConfigs {
@@ -67,6 +67,7 @@ dependencies {
     implementation("androidx.appcompat:appcompat:1.8.0")
     implementation("com.google.android.material:material:1.11.0")
     implementation("androidx.recyclerview:recyclerview:1.4.0")
+    implementation("androidx.viewpager2:viewpager2:1.1.0")
     implementation("androidx.swiperefreshlayout:swiperefreshlayout:1.2.0")
     implementation("androidx.lifecycle:lifecycle-runtime-ktx:2.11.0")
     implementation("androidx.fragment:fragment-ktx:1.9.1")

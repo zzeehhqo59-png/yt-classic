@@ -11,7 +11,6 @@ import android.view.inputmethod.EditorInfo
 import android.view.inputmethod.InputMethodManager
 import android.widget.EditText
 import android.widget.TextView
-import androidx.appcompat.app.AppCompatActivity
 import androidx.lifecycle.lifecycleScope
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
@@ -20,7 +19,7 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
-class SearchActivity : AppCompatActivity() {
+class SearchActivity : YtActivity() {
     override fun onResume() { super.onResume(); resAdapter.refreshProgress() }
     private lateinit var query: EditText
     private lateinit var suggestions: RecyclerView
@@ -41,7 +40,7 @@ class SearchActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
         edgeToEdge(lightBars = true)
         setContentView(R.layout.activity_search)
-        MiniPlayerBar.attach(this)
+        attachPlayerUi()
         findViewById<View>(R.id.root).padForSystemBars()
         query = findViewById(R.id.query)
         suggestions = findViewById(R.id.suggestions)

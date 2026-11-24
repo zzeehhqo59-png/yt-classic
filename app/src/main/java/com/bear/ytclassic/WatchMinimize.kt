@@ -1,7 +1,6 @@
 package com.bear.ytclassic
 
 import android.animation.ValueAnimator
-import android.app.Activity
 import android.graphics.drawable.Drawable
 import android.view.View
 import android.view.animation.DecelerateInterpolator
@@ -45,7 +44,7 @@ class WatchMinimize(
             override fun onDrag(dy: Float) = setProgress(dy / range())
             override fun onDragEnd(velocityY: Float) {
                 if (progress > 0.5f || velocityY > dp(600f)) animateTo(1f) { onFinished() }
-                else animateTo(0f) { activity()?.setTranslucentCompat(false) }
+                else animateTo(0f) {}
             }
         }
     }
@@ -70,7 +69,6 @@ class WatchMinimize(
     }
 
     private fun dp(v: Float) = v * density
-    private fun activity() = root.context as? Activity
 
     /** Top of the mini bar on the screen below (root coordinates): measured by [MiniTarget], else home's spot above the bottom nav. */
     private fun barTop(): Float {
@@ -119,6 +117,5 @@ class WatchMinimize(
 
     private fun beginCollapse() {
         hideControls()
-        activity()?.setTranslucentCompat(true)
     }
 }
