@@ -4,9 +4,15 @@ plugins {
     id("com.android.application")
 }
 
-val signing = Properties().apply {
+// Signing: CI passes YTCLASSIC_* env vars (keystore decoded from GitHub Secrets into the runner temp dir);
+// local builds fall back to signing.properties outside the repo. Never commit the key or passwords.
+val localSigning = Properties().apply {
     file("/workspace/yt-classic/keys/signing.properties").takeIf { it.exists() }?.inputStream()?.use { load(it) }
 }
+fun signingValue(env: String, prop: String): String? =
+    System.getenv(env)?.takeIf { it.isNotBlank() } ?: localSigning.getProperty(prop)?.takeIf { it.isNotBlank() }
+val keystorePath = signingValue("YTCLASSIC_KEYSTORE_PATH", "storeFile")
+val keystoreFile = keystorePath?.let { file(it) }?.takeIf { it.exists() }
 
 android {
     namespace = "com.bear.ytclassic"
@@ -22,24 +28,27 @@ android {
         versionName = "6.0.3"
     }
 
-    signingConfigs {
-        create("ytclassic") {
-            storeFile = file(signing.getProperty("storeFile"))
-            storePassword = signing.getProperty("storePassword")
-            keyAlias = signing.getProperty("keyAlias")
-            keyPassword = signing.getProperty("keyPassword")
+    if (keystoreFile != null) {
+        signingConfigs {
+            create("ytclassic") {
+                storeFile = keystoreFile
+                storePassword = signingValue("YTCLASSIC_STORE_PASSWORD", "storePassword")
+                keyAlias = signingValue("YTCLASSIC_KEY_ALIAS", "keyAlias")
+                keyPassword = signingValue("YTCLASSIC_KEY_PASSWORD", "keyPassword")
+            }
         }
     }
+    val appSigning = signingConfigs.findByName("ytclassic")
 
     buildTypes {
         release {
             isMinifyEnabled = true
             isShrinkResources = true
-            signingConfig = signingConfigs.getByName("ytclassic")
+            if (appSigning != null) signingConfig = appSigning
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
         }
         debug {
-            signingConfig = signingConfigs.getByName("ytclassic")
+            if (appSigning != null) signingConfig = appSigning
         }
     }
 
