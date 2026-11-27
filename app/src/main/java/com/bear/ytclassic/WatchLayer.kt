@@ -114,6 +114,10 @@ class WatchLayer private constructor(private val a: AppCompatActivity, private v
     private val pipListener = object : Player.Listener {
         override fun onIsPlayingChanged(isPlaying: Boolean) = updatePipParams()
         override fun onPlayWhenReadyChanged(playWhenReady: Boolean, reason: Int) = updatePipParams()
+        override fun onPlaybackStateChanged(state: Int) = updateSpinner()
+    }
+    private fun updateSpinner() {
+        playerLoading.visibility = if (WatchSpinner.visible(Playback.state.value, player.playbackState)) View.VISIBLE else View.GONE
     }
     private val backCb = object : OnBackPressedCallback(false) {
         override fun handleOnBackPressed() { onBack() }
@@ -198,6 +202,8 @@ class WatchLayer private constructor(private val a: AppCompatActivity, private v
         root.bringToFront()
         shrink.leaving = false
         reattach()
+        // a new layer (other screen / recreated activity) reopening the playing video gets no state change: sync now
+        render(Playback.state.value)
         applyLayout(a.resources.configuration)
         if (expandFrom > 0f && !isLandscape()) shrink.expandFrom(expandFrom) {} else shrink.setProgress(0f)
         updatePipParams()
@@ -236,7 +242,7 @@ class WatchLayer private constructor(private val a: AppCompatActivity, private v
                 related.refreshProgress()
             } else header.bindItem(it)
         }
-        playerLoading.visibility = if (st.loading) View.VISIBLE else View.GONE
+        updateSpinner()
         errorBox.visibility = if (st.error != null) View.VISIBLE else View.GONE
         playerError.text = st.error
         stateBlocking = st.loading || st.error != null

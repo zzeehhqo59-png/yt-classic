@@ -26,7 +26,7 @@ class SearchActivity : YtActivity() {
     private lateinit var results: RecyclerView
     private lateinit var progress: View
     private lateinit var message: TextView
-    private val sugAdapter = SuggestionAdapter({ submit(it) }, { fill(it) }, { askRemove(it) })
+    private val sugAdapter = SuggestionAdapter({ submit(it) }, { fill(it) }, { removeHistory(it) })
     private val resAdapter = VideoAdapter(false) { openItem(it) }
     private var filter = "all"
     private var lastQuery = ""
@@ -127,12 +127,8 @@ class SearchActivity : YtActivity() {
         }
     }
 
-    private fun askRemove(q: String) {
-        androidx.appcompat.app.AlertDialog.Builder(this)
-            .setTitle(q)
-            .setMessage("นำออกจากประวัติการค้นหาใช่ไหม")
-            .setPositiveButton("นำออก") { _, _ -> SearchHistory.remove(q); loadSuggestions(query.text.toString()) }
-            .setNegativeButton("ยกเลิก", null).show()
+    private fun removeHistory(q: String) {
+        SearchHistory.remove(q); loadSuggestions(query.text.toString())
     }
 
     private fun submit(q: String) {
@@ -195,12 +191,15 @@ class SuggestionAdapter(
         val hist = position < historyCount
         h.icon.setImageResource(if (hist) R.drawable.ic_history else R.drawable.ic_search)
         h.itemView.setOnClickListener { onPick(s) }
-        if (hist) h.itemView.setOnLongClickListener { onRemove(s); true } else h.itemView.setOnLongClickListener(null)
+        // × on recent searches only (no long-press anywhere)
+        h.remove.visibility = if (hist) View.VISIBLE else View.GONE
+        h.remove.setOnClickListener { onRemove(s) }
         h.fill.setOnClickListener { onFill(s) }
     }
     class VH(v: View) : RecyclerView.ViewHolder(v) {
         val text: TextView = v.findViewById(R.id.text)
         val fill: View = v.findViewById(R.id.fill)
         val icon: android.widget.ImageView = v.findViewById(R.id.icon)
+        val remove: View = v.findViewById(R.id.remove)
     }
 }

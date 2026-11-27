@@ -8,7 +8,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.SupervisorJob
 
-/** Home card menu (⋮ or long-press): normal video actions + ไม่สนใจ / ไม่แนะนำช่องนี้ with an undo snackbar. */
+/** Home card ⋮ menu: normal video actions + ไม่สนใจ / ไม่แนะนำช่องนี้ with an undo snackbar. */
 class HomeHide(private val fragment: Fragment, private val adapter: () -> VideoAdapter) {
     fun menu(anchor: View, v: VideoItem) = anchor.showVideoMenu(v, listOf(
         "ไม่สนใจ" to { notInterested(v) },

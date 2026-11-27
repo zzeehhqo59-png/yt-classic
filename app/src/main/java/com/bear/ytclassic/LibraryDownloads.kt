@@ -11,7 +11,7 @@ import android.widget.TextView
 import androidx.appcompat.app.AlertDialog
 import coil3.load
 
-/** Download rows on the คุณ page. No ⋮ button: tap plays/resumes, long-press opens the menu. */
+/** Download rows on the คุณ page. Tap plays/resumes, ⋮ opens the menu. */
 class LibraryDownloads(private val ctx: Context, private val box: LinearLayout) {
     fun render(list: List<Downloads.Dl>) {
         val ids = list.map { it.id }
@@ -35,7 +35,10 @@ class LibraryDownloads(private val ctx: Context, private val box: LinearLayout) 
                 else -> menu(nv, cur)
             }
         }
-        nv.setOnLongClickListener { (nv.tag as? Downloads.Dl)?.let { menu(nv, it) }; true }
+        nv.findViewById<View>(R.id.more).apply {
+            visibility = View.VISIBLE
+            setOnClickListener { v -> (nv.tag as? Downloads.Dl)?.let { menu(v, it) } }
+        }
         box.addView(nv)
         return nv
     }

@@ -95,7 +95,7 @@ class HomeFragment : Fragment() {
     override fun onViewCreated(view: View, s: Bundle?) {
         list = view.findViewById(R.id.list)
         val hide = HomeHide(this) { adapter }
-        adapter = VideoAdapter(true, onMore = { anchor, v -> hide.menu(anchor, v) }, longPressMenu = true) { requireContext().openVideo(it) }
+        adapter = VideoAdapter(true, onMore = { anchor, v -> hide.menu(anchor, v) }) { requireContext().openVideo(it) }
         list.layoutManager = LinearLayoutManager(requireContext())
         list.adapter = adapter
         list.onNearEnd { loadMore() }

@@ -11,4 +11,6 @@
     <ProgressBar android:id="@+id/progress" style="?android:attr/progressBarStyleHorizontal" android:layout_width="match_parent" android:layout_height="4dp" android:layout_marginTop="4dp"
         android:progressTint="#FF0000" android:progressBackgroundTint="@color/divider" android:max="100"/>
   </LinearLayout>
+  <ImageView android:id="@+id/more" android:layout_width="40dp" android:layout_height="40dp" android:layout_marginEnd="-8dp" android:padding="10dp"
+      android:background="?attr/selectableItemBackgroundBorderless" android:src="@drawable/ic_more_vert" android:contentDescription="@string/more" android:visibility="gone"/>
 </LinearLayout>

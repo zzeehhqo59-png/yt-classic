@@ -120,7 +120,11 @@ class LibraryFragment : Fragment() {
                 cover.load(r.cover); icon.visibility = View.GONE
             }
             v.setOnClickListener { open(r) }
-            if (r.editable) v.setOnLongClickListener { playlistMenu(r); true }
+            // ⋮ only on playlists the user made (rename / delete); none on ดูภายหลัง / วิดีโอที่ชอบ / system rows
+            v.findViewById<View>(R.id.more).apply {
+                visibility = if (LibraryModel.hasMenu(r)) View.VISIBLE else View.GONE
+                setOnClickListener { playlistMenu(r) }
+            }
             box.addView(v)
         }
     }
@@ -161,7 +165,7 @@ class LibraryFragment : Fragment() {
         }
     }
 
-    /** Long-press menu (instead of a ⋮ button) for the user's own playlists. */
+    /** ⋮ menu (rename / delete) for the user's own playlists. */
     private fun playlistMenu(r: LibraryModel.Row) {
         val id = r.playlistId ?: return
         val ctx = requireContext()

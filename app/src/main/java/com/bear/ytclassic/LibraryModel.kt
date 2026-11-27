@@ -9,6 +9,9 @@ import java.util.Locale
  * stores on the phone is used (history, local playlists, likes, downloads, subscriptions).
  */
 object LibraryModel {
+    /** Rows with a ⋮ (rename / delete): only playlists the user created. */
+    fun hasMenu(r: Row): Boolean = r.editable && r.kind == Kind.PLAYLIST && r.playlistId != null
+
     /** ALL is the first chip; it is the sort dropdown, so its label is the current [Sort]. */
     enum class Filter(val label: String) {
         ALL("ทั้งหมด"), DOWNLOADED("ดาวน์โหลดแล้ว"), PLAYLISTS("เพลย์ลิสต์"), MUSIC("เพลง"),
@@ -53,7 +56,7 @@ object LibraryModel {
         val cover: String?,
         val playlistId: Long? = null,
         val latest: Long = 0,
-        /** Long-press can rename/delete it (user playlists only). */
+        /** Has a ⋮ to rename/delete it (user playlists only). */
         val editable: Boolean = false,
     )
 

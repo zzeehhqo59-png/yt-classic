@@ -26,7 +26,7 @@ import kotlinx.coroutines.launch
 
 /** การติดตาม tab: subscribed channels row + newest videos from all of them. */
 class SubsFragment : Fragment() {
-    private val channels = ChannelRowAdapter { load(force = false) }
+    private val channels = ChannelRowAdapter()
     private val header = SubsHeader()
     private lateinit var videos: VideoAdapter
     private var loadedVersion = -1L
@@ -140,7 +140,7 @@ class SubsFragment : Fragment() {
     }
 }
 
-class ChannelRowAdapter(private val onChange: () -> Unit = {}) : RecyclerView.Adapter<ChannelRowAdapter.VH>() {
+class ChannelRowAdapter : RecyclerView.Adapter<ChannelRowAdapter.VH>() {
     private val items = ArrayList<Channel>()
     fun set(list: List<Channel>) { items.clear(); items.addAll(list); notifyDataSetChanged() }
     override fun getItemCount() = items.size
@@ -151,12 +151,6 @@ class ChannelRowAdapter(private val onChange: () -> Unit = {}) : RecyclerView.Ad
         h.avatar.loadAvatar(c.avatar)
         h.name.text = c.name
         h.itemView.setOnClickListener { it.context.openChannel(c.url, c.name, c.avatar) }
-        h.itemView.setOnLongClickListener { v ->
-            AlertDialog.Builder(v.context).setMessage("เลิกติดตาม ${c.name} ใช่ไหม")
-                .setPositiveButton("เลิกติดตาม") { _, _ -> Subs.remove(c.url); onChange() }
-                .setNegativeButton("ยกเลิก", null).show()
-            true
-        }
     }
     class VH(v: View) : RecyclerView.ViewHolder(v) {
         val avatar: ImageView = v.findViewById(R.id.avatar)

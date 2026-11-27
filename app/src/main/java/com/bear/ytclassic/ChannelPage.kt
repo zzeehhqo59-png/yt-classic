@@ -10,6 +10,15 @@ data class ChannelTabSpec(val id: String, val label: String)
  * (never the video itself). Null means do not navigate.
  */
 object VideoClicks {
+    enum class Part { ROW, AVATAR, CHANNEL_NAME }
+
+    /**
+     * Which part of a video row opens the uploader's channel instead of the row's own item. Only the round
+     * avatar (Home / related cards); the channel name line in compact rows (search, channel, history) belongs
+     * to the row, otherwise taps in the middle of a search result opened a channel.
+     */
+    fun opensChannel(part: Part): Boolean = part == Part.AVATAR
+
     fun channelUrl(item: VideoItem): String? {
         val url = item.channelUrl?.trim().orEmpty()
         if (url.isEmpty() || url == item.url) return null

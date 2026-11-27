@@ -39,8 +39,6 @@ class VideoAdapter(
     private val onMore: ((View, VideoItem) -> Unit)? = null,
     /** Playlists keep deleted / private videos (dimmed) even with "ซ่อนวิดีโอที่ดูไม่ได้" on. */
     private val canHide: Boolean = true,
-    /** Long-press a video card opens the same menu as its ⋮ button (Home). */
-    private val longPressMenu: Boolean = false,
     private val onClick: (VideoItem) -> Unit,
 ) : RecyclerView.Adapter<RecyclerView.ViewHolder>() {
     val items = ArrayList<VideoItem>()
@@ -106,8 +104,7 @@ class VideoAdapter(
 
         fun bind(it: VideoItem) {
             more?.setOnClickListener { view -> (onMore ?: { a, b -> a.showVideoMenu(b) })(view, it) }
-            if (longPressMenu && it.kind == 0) itemView.setOnLongClickListener { _ -> (onMore ?: { a, b -> a.showVideoMenu(b) })(more ?: itemView, it); true }
-            else itemView.setOnLongClickListener(null)
+            itemView.setOnClickListener { _ -> onClick(it) }
             val p = progress[it.url] ?: 0
             watched?.visibility = if (p > 0 && it.kind == 0) View.VISIBLE else View.GONE
             watched?.progress = p
@@ -144,15 +141,22 @@ class VideoAdapter(
                 val url = VideoClicks.channelUrl(it) ?: return@OnClickListener
                 itemView.context.openChannel(url, it.channel, it.avatar)
             }
-            avatar?.apply { isClickable = true; isFocusable = true; setOnClickListener(openCh); contentDescription = "ช่อง" }
-            channel?.apply { isClickable = true; isFocusable = true; setOnClickListener(openCh) }
-            itemView.setOnClickListener { _ -> onClick(it) }
+            avatar?.link(if (VideoClicks.opensChannel(VideoClicks.Part.AVATAR)) openCh else null, "ช่อง")
+            // the channel name line in compact rows is part of the row (it spans the row; tapping it used to open the channel)
+            channel?.link(if (VideoClicks.opensChannel(VideoClicks.Part.CHANNEL_NAME)) openCh else null, null)
+        }
+
+        /** Gives [this] its own tap action, or makes it plain again so the row's click (the bound item) gets the tap. */
+        private fun View.link(l: View.OnClickListener?, desc: String?) {
+            setOnClickListener(l)
+            isClickable = l != null; isFocusable = l != null
+            contentDescription = if (l != null) desc else null
         }
 
         /** Channel / playlist rows in search results. */
         private fun bindOther(it: VideoItem) {
             title.text = it.title
-            itemView.setOnClickListener { _ -> onClick(it) }
+            avatar?.link(null, null); channel?.link(null, null)
             if (it.kind == 1) {
                 thumb.scaleType = ImageView.ScaleType.FIT_CENTER
                 thumb.load(it.thumb) { transformations(CircleCropTransformation()) }
