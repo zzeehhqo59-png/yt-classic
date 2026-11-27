@@ -15,7 +15,7 @@ import androidx.recyclerview.widget.RecyclerView
 import coil3.load
 import coil3.request.crossfade
 
-/** Banner, identity, subscribe and a 2-line description that opens the About sheet. */
+/** Banner, identity, subscribe and a 1-line description + ...เพิ่มเติม that opens the About page. */
 class ChannelHeaderAdapter(
     private val state: () -> ChannelUiState,
     private val onAbout: () -> Unit,
@@ -53,13 +53,12 @@ fun View.bindChannelHeader(st: ChannelUiState, onAbout: () -> Unit) {
             if (about.description.isBlank()) desc.visibility = View.GONE
             else {
                 desc.visibility = View.VISIBLE
-                desc.maxLines = 2
+                desc.maxLines = 1
                 desc.ellipsize = android.text.TextUtils.TruncateAt.END
-                desc.text = about.description
+                desc.text = about.description.lineSequence().firstOrNull { it.isNotBlank() }.orEmpty().trim()
             }
             more.visibility = View.VISIBLE
-            more.setOnClickListener { onAbout() }
-            desc.setOnClickListener { onAbout() }
+            v.findViewById<View>(R.id.descRow).setOnClickListener { onAbout() }
         }
 }
 
@@ -157,39 +156,5 @@ class ShortsAdapter(private val onClick: (VideoItem) -> Unit) : RecyclerView.Ada
         v.findViewById<TextView>(R.id.title).text = video.title
         v.findViewById<TextView>(R.id.meta).text = Fmt.views(video.views, video.live)
         v.setOnClickListener { onClick(video) }
-    }
-}
-
-fun Context.channelAboutSheet(name: String, about: ChannelAbout) = sheet { box, _ ->
-    box.sheetTitle("เกี่ยวกับ")
-    val pad = (20 * resources.displayMetrics.density).toInt()
-    if (name.isNotBlank()) {
-        box.addView(TextView(this).apply {
-            text = name; textSize = 16f; setTypeface(typeface, android.graphics.Typeface.BOLD)
-            setTextColor(ContextCompat.getColor(context, R.color.text1)); setPadding(pad, 0, pad, pad / 3)
-        })
-    }
-    about.stats().forEach { (label, value) ->
-        box.addView(TextView(this).apply {
-            text = "$label  $value"; textSize = 13f
-            setTextColor(ContextCompat.getColor(context, R.color.text2)); setPadding(pad, 0, pad, pad / 4)
-        })
-    }
-    if (about.description.isNotBlank()) {
-        box.addView(TextView(this).apply {
-            text = about.description; textSize = 14f; setLineSpacing(2 * resources.displayMetrics.density, 1f)
-            setTextColor(ContextCompat.getColor(context, R.color.text1)); setPadding(pad, pad / 2, pad, pad / 2)
-            setTextIsSelectable(true)
-        })
-    }
-    about.links.forEach { url ->
-        box.addView(TextView(this).apply {
-            text = url; textSize = 14f; setTextColor(ContextCompat.getColor(context, R.color.link))
-            setPadding(pad, pad / 4, pad, pad / 4)
-            setOnClickListener {
-                runCatching { startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url))) }
-                    .onFailure { android.util.Log.w("Channel", "open link failed", it) }
-            }
-        })
     }
 }

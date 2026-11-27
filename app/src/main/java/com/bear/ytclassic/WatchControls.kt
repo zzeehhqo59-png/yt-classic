@@ -69,7 +69,9 @@ class WatchControls(private val a: AppCompatActivity, private val root: View, pr
     private lateinit var previewPill: TextView
     private lateinit var centerRow: View
     private var storyboard: Storyboard? = null
-    private var segments: List<org.schabi.newpipe.extractor.stream.StreamSegment> = emptyList()
+    /** Chapter gaps on the bar, the landscape chapter pill and the header's chapter row. */
+    lateinit var chapters: WatchChapters
+        private set
     private val hideCtl = Runnable { show(false) }
     private val ticker = object : Runnable {
         override fun run() { updateTime(); playerView.postDelayed(this, 500) }
@@ -109,6 +111,7 @@ class WatchControls(private val a: AppCompatActivity, private val root: View, pr
         previewImg = root.findViewById(R.id.previewImg)
         previewPill = root.findViewById(R.id.previewPill)
         centerRow = root.findViewById(R.id.centerRow)
+        chapters = WatchChapters(a, seek, root.findViewById(R.id.chapterPill)) { player.seekTo(it); updateTime(); scheduleHide() }
         btnPlay.setOnClickListener {
             when {
                 player.playbackState == Player.STATE_ENDED -> { Playback.cancelAutoplay(); player.seekTo(0); player.play() }
@@ -161,7 +164,7 @@ class WatchControls(private val a: AppCompatActivity, private val root: View, pr
     /** Storyboard frame + "mm:ss  chapter" pill above the knob while scrubbing. */
     private fun showPreview(pos: Long, x: Float) {
         lastScrubX = x
-        val chapter = segments.lastOrNull { it.startTimeSeconds * 1000L <= pos }?.title?.takeIf { it.isNotBlank() }
+        val chapter = chapters.chapters.lastOrNull { it.startMs <= pos }?.title?.takeIf { it.isNotBlank() }
         previewPill.text = if (chapter != null) "${fmtTime(pos)}  $chapter" else fmtTime(pos)
         timePill.text = "${fmtTime(pos)} / ${fmtTime(player.duration)}"
         val sb = storyboard
@@ -181,6 +184,7 @@ class WatchControls(private val a: AppCompatActivity, private val root: View, pr
         root.findViewById<View>(R.id.titleBox).visibility = g
         root.findViewById<View>(R.id.topSpacer).visibility = if (land) View.GONE else View.VISIBLE
         root.findViewById<View>(R.id.landRow).visibility = g
+        chapters.layout(land)
         btnFull.setImageResource(if (land) R.drawable.ic_fullscreen_exit else R.drawable.ic_fullscreen)
         btnFull.contentDescription = if (land) "ออกจากโหมดเต็มหน้าจอ" else "เต็มหน้าจอ"
         val rowH = dp(80f).toInt()
@@ -246,6 +250,7 @@ class WatchControls(private val a: AppCompatActivity, private val root: View, pr
             seek.buffered = player.bufferedPosition
             if (!seek.scrubbing) timePill.text = "${fmtTime(player.currentPosition)} / ${fmtTime(dur)}"
         }
+        chapters.tick(if (live) -1 else player.currentPosition)
     }
 
     // ---- captions ----
@@ -344,7 +349,7 @@ class WatchControls(private val a: AppCompatActivity, private val root: View, pr
     fun bindInfo(info: StreamInfo?) {
         if (info === sbFor) return
         sbFor = info; storyboard?.release(); storyboard = Storyboard.of(info)
-        segments = info?.streamSegments.orEmpty().sortedBy { s -> s.startTimeSeconds }
+        if (::chapters.isInitialized) chapters.bind(info)
     }
 
     /** Landscape title row and the up-next button for the current video. */

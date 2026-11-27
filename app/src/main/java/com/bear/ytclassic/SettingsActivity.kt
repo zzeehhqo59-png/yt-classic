@@ -13,7 +13,9 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.lifecycleScope
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import com.google.android.material.switchmaterial.SwitchMaterial
 
 /** Settings in the style of the classic YouTube Android app: grouped sections, title + summary rows, switches on the right. */
@@ -132,6 +134,19 @@ class SettingsActivity : YtActivity() {
             Prefs.hideUnplayable = it
         }
 
+        val hidden = HiddenRecs.count()
+        item("ล้างรายการที่ซ่อนไว้", if (hidden == 0) "ไม่มีวิดีโอหรือช่องที่ซ่อนจากหน้าแรก" else "วิดีโอและช่องที่เลือก \"ไม่สนใจ\" หรือ \"ไม่แนะนำช่องนี้\" $hidden รายการ จะกลับมาแนะนำในหน้าแรกได้อีก") {
+            AlertDialog.Builder(this).setTitle("ล้างรายการที่ซ่อนไว้ใช่ไหม")
+                .setMessage("วิดีโอและช่องที่ซ่อนไว้จะกลับมาแสดงในหน้าแรกได้อีก")
+                .setNegativeButton("ยกเลิก", null)
+                .setPositiveButton("ล้าง") { _, _ ->
+                    lifecycleScope.launch {
+                        withContext(Dispatchers.IO) { HiddenRecs.clear() }
+                        Toast.makeText(this@SettingsActivity, "ล้างรายการที่ซ่อนไว้แล้ว", Toast.LENGTH_SHORT).show()
+                        build()
+                    }
+                }.show()
+        }
         section("เกี่ยวกับ")
         val ver = runCatching { packageManager.getPackageInfo(packageName, 0).versionName }.getOrDefault("")
         item("เวอร์ชัน", "YT Classic $ver") {}

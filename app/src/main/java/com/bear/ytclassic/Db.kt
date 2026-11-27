@@ -10,6 +10,7 @@ import androidx.appcompat.app.AppCompatDelegate
 
 /** App database ytclassic.db (subscriptions, history, playlists). */
 object Db {
+    const val VERSION = 8
     lateinit var helper: SQLiteOpenHelper
     val r: SQLiteDatabase get() = helper.readableDatabase
     val w: SQLiteDatabase get() = helper.writableDatabase
@@ -18,12 +19,12 @@ object Db {
     private const val VDEF = "url TEXT NOT NULL, title TEXT, channel TEXT, channel_url TEXT, thumb TEXT, avatar TEXT, duration INTEGER, views INTEGER, uploaded_ms INTEGER"
 
     fun init(c: Context) {
-        helper = object : SQLiteOpenHelper(c.applicationContext, "ytclassic.db", null, 7) {
+        helper = object : SQLiteOpenHelper(c.applicationContext, "ytclassic.db", null, VERSION) {
             override fun onCreate(db: SQLiteDatabase) {
                 db.execSQL("CREATE TABLE subs (url TEXT PRIMARY KEY, name TEXT NOT NULL, avatar TEXT, subscribers INTEGER NOT NULL DEFAULT -1, added INTEGER NOT NULL)")
-                createV2(db); createV3(db); createV4(db); createV6(db); createV7(db)
+                createV2(db); createV3(db); createV4(db); createV6(db); createV7(db); createV8(db)
             }
-            override fun onUpgrade(db: SQLiteDatabase, o: Int, n: Int) { if (o < 2) createV2(db); if (o < 3) createV3(db); if (o < 4) createV4(db); if (o in 2..4) rekeyHistory(db); if (o < 6) createV6(db); if (o < 7) createV7(db) }
+            override fun onUpgrade(db: SQLiteDatabase, o: Int, n: Int) { if (o < 2) createV2(db); if (o < 3) createV3(db); if (o < 4) createV4(db); if (o in 2..4) rekeyHistory(db); if (o < 6) createV6(db); if (o < 7) createV7(db); if (o < 8) createV8(db) }
         }
     }
 
@@ -37,6 +38,9 @@ object Db {
     /** 6.0.3: snap nearly finished history rows to the end so they count as watched. */
     fun markFinishedWatchProgressSql() =
         "UPDATE history SET position_ms = length_ms WHERE length_ms > 0 AND position_ms > 0 AND position_ms >= length_ms - 15000"
+
+    /** 6.0.7: Home "ไม่สนใจ" / "ไม่แนะนำช่องนี้" (new table only; existing data untouched). */
+    private fun createV8(db: SQLiteDatabase) { db.execSQL(HiddenRecs.ddl()) }
 
     private fun createV7(db: SQLiteDatabase) {
         db.execSQL(markFinishedWatchProgressSql())

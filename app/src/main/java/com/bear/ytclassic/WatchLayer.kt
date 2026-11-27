@@ -97,6 +97,9 @@ class WatchLayer private constructor(private val a: AppCompatActivity, private v
         currentRating = { Likes.state(item.url) },
         onRate = { rate(it) },
         onCommentsChanged = { t, p, av -> if (::ctl.isInitialized) ctl.updateLandComments(t, p, av) },
+        currentChapter = { if (::ctl.isInitialized) ctl.chapters.currentTitle() else null },
+        onChapters = { if (::ctl.isInitialized) ctl.chapters.showSheet() },
+        onSeek = { ms -> Playback.player.seekTo(ms); if (::ctl.isInitialized) ctl.updateTime() },
     ))
     private val comments: WatchComments = WatchComments(a) { t, p, av -> header.setComments(t, p, av) }
     private lateinit var ctl: WatchControls
@@ -149,6 +152,7 @@ class WatchLayer private constructor(private val a: AppCompatActivity, private v
             override fun rate(value: Int) = this@WatchLayer.rate(value)
         })
         ctl.setup()
+        ctl.chapters.onChange = { header.chapterChanged() }
         ctl.setupGestures()
         a.onBackPressedDispatcher.addCallback(a, backCb)
         a.lifecycle.addObserver(this)

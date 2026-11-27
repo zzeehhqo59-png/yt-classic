@@ -128,7 +128,7 @@ class ChannelActivity : YtActivity() {
     private fun showAbout() {
         val st = vm.ui.value
         val about = st.about ?: return
-        channelAboutSheet(st.channel?.name.orEmpty(), about)
+        startActivity(ChannelAboutActivity.intent(this, st.channel?.name.orEmpty(), st.channel?.url.orEmpty(), about))
     }
 }
 

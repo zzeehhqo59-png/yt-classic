@@ -24,8 +24,8 @@ android {
         applicationId = "com.bear.ytclassic"
         minSdk = 23
         targetSdk = 35
-        versionCode = 7006
-        versionName = "6.0.6"
+        versionCode = 7007
+        versionName = "6.0.7"
     }
 
     if (keystoreFile != null) {

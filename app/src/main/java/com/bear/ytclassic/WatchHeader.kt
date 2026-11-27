@@ -26,6 +26,11 @@ class WatchHeaderAdapter(private val a: AppCompatActivity, private val cb: Callb
         fun rate(value: Int)
         /** The comments card changed (the landscape row mirrors it). */
         fun onComments(title: String?, preview: String?, avatar: String?)
+        /** Title of the chapter playing now, or null when the video has no chapters. */
+        fun chapterTitle(): String? = null
+        fun openChapters() {}
+        /** A timestamp in the description was tapped. */
+        fun seekTo(ms: Long) {}
     }
 
     private var title = ""; private var channel = ""; private var meta = ""; private var stats = ""
@@ -35,6 +40,11 @@ class WatchHeaderAdapter(private val a: AppCompatActivity, private val cb: Callb
     fun setComments(title: String?, preview: String?, avatar: String?) {
         cTitle = title; cPreview = preview; cAvatar = avatar; notifyItemChanged(0); cb.onComments(title, preview, avatar)
     }
+
+    private var descSheet: android.app.Dialog? = null
+
+    /** The current chapter changed: only the chapter row is rebound. */
+    fun chapterChanged() = notifyItemChanged(0, CHAPTER)
 
     fun reset() { likes = ""; desc = ""; subCount = -1; stats = "" }
 
@@ -61,6 +71,7 @@ class WatchHeaderAdapter(private val a: AppCompatActivity, private val cb: Callb
         val d = i.description ?: Description.EMPTY_DESCRIPTION
         desc = if (d.type() == Description.Type.HTML) HtmlCompat.fromHtml(d.content().orEmpty(), HtmlCompat.FROM_HTML_MODE_LEGACY).trim()
         else android.text.SpannableString(d.content().orEmpty()).also { android.text.util.Linkify.addLinks(it, android.text.util.Linkify.WEB_URLS) }
+        desc = linkTimestamps(desc, if (live) 0 else i.duration * 1000L)
         notifyItemChanged(0)
     }
 
@@ -70,8 +81,36 @@ class WatchHeaderAdapter(private val a: AppCompatActivity, private val cb: Callb
         return object : RecyclerView.ViewHolder(v) {}
     }
 
+    /** 12:30 / 1:02:03 in the description become links that seek the player. */
+    private fun linkTimestamps(text: CharSequence, durationMs: Long): CharSequence {
+        val stamps = Chapters.timestamps(text, durationMs)
+        if (stamps.isEmpty()) return text
+        val sp = android.text.SpannableString(text)
+        stamps.filter { st -> sp.getSpans(st.start, st.end, android.text.style.URLSpan::class.java).isEmpty() }.forEach { st ->
+            sp.setSpan(object : android.text.style.ClickableSpan() {
+                override fun onClick(widget: View) { descSheet?.dismiss(); cb.seekTo(st.ms) }
+            }, st.start, st.end, android.text.Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
+        }
+        return sp
+    }
+
+    override fun onBindViewHolder(holder: RecyclerView.ViewHolder, position: Int, payloads: MutableList<Any>) {
+        if (payloads.isNotEmpty() && payloads.all { it == CHAPTER }) bindChapter(holder.itemView) else onBindViewHolder(holder, position)
+    }
+
+    private fun bindChapter(v: View) {
+        val t = cb.chapterTitle()
+        v.findViewById<View>(R.id.chapterRow).apply {
+            visibility = if (t == null) View.GONE else View.VISIBLE
+            setOnClickListener { cb.openChapters() }
+            contentDescription = t?.let { "บท: $it" }
+        }
+        v.findViewById<TextView>(R.id.chapterTitle).text = t
+    }
+
     override fun onBindViewHolder(holder: RecyclerView.ViewHolder, position: Int) {
         val v = holder.itemView
+        bindChapter(v)
         v.findViewById<TextView>(R.id.wTitle).text = title
         val more = "...เพิ่มเติม"
         val sp = android.text.SpannableStringBuilder(meta).append(if (meta.isEmpty()) "" else "  ")
@@ -80,7 +119,7 @@ class WatchHeaderAdapter(private val a: AppCompatActivity, private val cb: Callb
         sp.setSpan(android.text.style.StyleSpan(android.graphics.Typeface.BOLD), st, sp.length, android.text.Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
         sp.setSpan(android.text.style.ForegroundColorSpan(androidx.core.content.ContextCompat.getColor(a, R.color.text1)), st, sp.length, android.text.Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
         v.findViewById<TextView>(R.id.wMeta).text = sp
-        v.findViewById<View>(R.id.titleRow).setOnClickListener { a.descriptionSheet(title, stats.ifEmpty { meta }, desc) }
+        v.findViewById<View>(R.id.titleRow).setOnClickListener { descSheet = a.descriptionSheet(title, stats.ifEmpty { meta }, desc) }
         v.findViewById<ImageView>(R.id.wAvatar).loadAvatar(avatar)
         v.findViewById<TextView>(R.id.wChannelName).text = channel
         v.findViewById<View>(R.id.channelIdentity).setOnClickListener { a.openChannel(channelUrl, channel, avatar) }
@@ -104,6 +143,8 @@ class WatchHeaderAdapter(private val a: AppCompatActivity, private val cb: Callb
         v.findViewById<View>(R.id.btnDislike).setOnClickListener { cb.rate(Likes.DISLIKE) }
     }
 
+    private companion object { const val CHAPTER = "chapter" }
+
 }
 
 /** 👍 / 👎 tint: blue when chosen (like the old app), otherwise [normal]. */
@@ -119,7 +160,7 @@ fun Context.descriptionSheet(title: String, stats: String, desc: CharSequence) =
     box.addView(TextView(this@descriptionSheet).apply {
         text = desc.ifEmpty { "ไม่มีคำอธิบาย" }; textSize = 14f; setLineSpacing(2 * resources.displayMetrics.density, 1f)
         setTextColor(androidx.core.content.ContextCompat.getColor(context, R.color.text1)); setPadding(pad, 0, pad, pad)
-        movementMethod = LinkMovementMethod.getInstance(); setTextIsSelectable(true)
+        setTextIsSelectable(true); movementMethod = LinkMovementMethod.getInstance()
         setLinkTextColor(androidx.core.content.ContextCompat.getColor(context, R.color.link))
     })
 }

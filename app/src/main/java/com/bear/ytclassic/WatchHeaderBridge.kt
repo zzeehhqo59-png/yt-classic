@@ -13,7 +13,13 @@ class WatchHeaderBridge(
     private val currentRating: () -> Int,
     private val onRate: (Int) -> Unit,
     private val onCommentsChanged: (String?, String?, String?) -> Unit,
+    private val currentChapter: () -> String? = { null },
+    private val onChapters: () -> Unit = {},
+    private val onSeek: (Long) -> Unit = {},
 ) : WatchHeaderAdapter.Callbacks {
+    override fun chapterTitle(): String? = currentChapter()
+    override fun openChapters() = onChapters()
+    override fun seekTo(ms: Long) = onSeek(ms)
     override fun openComments() = onComments()
     override fun moreSheet() = onMore()
     override fun share() = onShare()

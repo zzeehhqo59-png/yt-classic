@@ -15,6 +15,7 @@ object Likes {
         if (value == 0) Db.w.delete("likes", "url=?", arrayOf(v.url))
         else Db.w.insertWithOnConflict("likes", null, Db.values(v).apply { put("value", value); put("at", System.currentTimeMillis()) }, SQLiteDatabase.CONFLICT_REPLACE)
         version++
+        Recommender.invalidate()
     }
 
     /** Tapping 👍 / 👎: same button again clears it. Returns the new state. */
@@ -35,6 +36,12 @@ object Likes {
     fun liked(): List<VideoItem> = Db.r.rawQuery("SELECT ${Db.VCOLS}, short_form FROM likes WHERE value=1 ORDER BY at DESC", null).use { c ->
         buildList { while (c.moveToNext()) add(Db.video(c)) }
     }
+
+    /** Every rated video with its value (1 / -1), newest first; used by Home recommendations. */
+    fun rated(): List<Pair<VideoItem, Int>> =
+        Db.r.rawQuery("SELECT ${Db.VCOLS}, short_form, value FROM likes ORDER BY at DESC", null).use { c ->
+            buildList { while (c.moveToNext()) add(Db.video(c) to c.getInt(c.getColumnIndexOrThrow("value"))) }
+        }
 
     /** Time of the most recent like, 0 if none. */
     fun latest(): Long = Db.r.rawQuery("SELECT COALESCE(MAX(at), 0) FROM likes WHERE value=1", null).use { it.moveToFirst(); it.getLong(0) }

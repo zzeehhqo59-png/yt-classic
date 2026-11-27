@@ -25,6 +25,21 @@ data class ChannelAbout(
     val joinedMs: Long = 0,
     val links: List<String> = emptyList(),
 ) {
+    enum class Info { URL, SUBSCRIBERS, VIDEOS, VIEWS, JOINED }
+
+    /**
+     * ข้อมูลเพิ่มเติม rows. NewPipeExtractor 0.27.1 has no channel About tab: it gives the url, description,
+     * subscriber count and tags only, so country / join date / total views / video count stay hidden unless set.
+     */
+    fun infoRows(channelUrl: String): List<Pair<Info, String>> = buildList {
+        if (channelUrl.isNotBlank()) add(Info.URL to channelUrl.removePrefix("https://").removePrefix("http://"))
+        if (subscriberCount >= 0) add(Info.SUBSCRIBERS to "ผู้ติดตาม ${Fmt.shortNum(subscriberCount)} คน")
+        if (videoCount >= 0) add(Info.VIDEOS to "วิดีโอ ${Fmt.shortNum(videoCount)} รายการ")
+        if (viewCount >= 0) add(Info.VIEWS to "การดู ${Fmt.fullViews(viewCount, false)}")
+        if (joinedMs > 0) add(Info.JOINED to "เข้าร่วมเมื่อ " + Fmt.thaiDate(
+            java.time.OffsetDateTime.ofInstant(java.time.Instant.ofEpochMilli(joinedMs), java.time.ZoneId.systemDefault())))
+    }
+
     /** Only stats the extractor actually provided (missing values stay hidden). */
     fun stats(): List<Pair<String, String>> = buildList {
         if (subscriberCount >= 0) add("ผู้ติดตาม" to "${Fmt.shortNum(subscriberCount)} คน")
@@ -106,6 +121,10 @@ object ChannelPage {
         if ("youtube.com" in low && ("/join" in low || "/channelmembership" in low)) return false
         return true
     }
+
+    /** Links have no titles in the extractor data, so the title is the site name (host without www.). */
+    fun linkTitle(url: String): String =
+        runCatching { java.net.URI(url.trim()).host.orEmpty() }.getOrDefault("").removePrefix("www.").ifBlank { url }
 
     fun linksFrom(description: String, extra: List<String> = emptyList()): List<String> {
         val found = urlRe.findAll(description).map { it.value.trimEnd('.', ',', ';', ')') }.toList()

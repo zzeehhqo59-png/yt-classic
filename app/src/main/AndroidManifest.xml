@@ -38,6 +38,10 @@
         android:supportsPictureInPicture="true" android:resizeableActivity="true"
         android:enableOnBackInvokedCallback="false"
         android:configChanges="orientation|screenSize|screenLayout|smallestScreenSize|keyboardHidden"/>
+    <activity android:name=".ChannelAboutActivity" android:exported="false"
+        android:supportsPictureInPicture="true" android:resizeableActivity="true"
+        android:enableOnBackInvokedCallback="false"
+        android:configChanges="orientation|screenSize|screenLayout|smallestScreenSize|keyboardHidden"/>
     <activity android:name=".SeriesActivity" android:exported="false"
         android:supportsPictureInPicture="true" android:resizeableActivity="true"
         android:enableOnBackInvokedCallback="false"

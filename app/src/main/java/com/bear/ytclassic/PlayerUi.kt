@@ -27,6 +27,8 @@ class YtSeekBar @JvmOverloads constructor(c: Context, a: AttributeSet? = null) :
     var buffered = 0L; set(v) { field = v; invalidate() }
     var showKnob = true; set(v) { field = v; invalidate() }
     var lineFromBottom = 2f * d; set(v) { field = v; invalidate() }
+    /** Chapter starts (ms): the bar is drawn in pieces with a small gap before each. */
+    var chapterStarts: List<Long> = emptyList(); set(v) { field = v; invalidate() }
     var listener: Listener? = null
     var scrubbing = false; private set
     private var scrubPos = 0L
@@ -45,13 +47,23 @@ class YtSeekBar @JvmOverloads constructor(c: Context, a: AttributeSet? = null) :
     override fun onDraw(cv: Canvas) {
         val th = if (scrubbing) 5f * d else if (showKnob) 3f * d else 2f * d
         val cy = height - lineFromBottom
-        r.set(left(), cy - th / 2, right(), cy + th / 2); cv.drawRect(r, pBack)
-        if (duration > 0) {
-            r.right = xOf(buffered); cv.drawRect(r, pBuf)
-            val px = knobX()
-            r.right = px; cv.drawRect(r, pPlay)
-            if (showKnob || scrubbing) cv.drawCircle(px, cy, if (scrubbing) 9f * d else 6f * d, pPlay)
+        val pieces = Chapters.ranges(chapterStarts, duration)
+        if (pieces.size < 2) {
+            r.set(left(), cy - th / 2, right(), cy + th / 2); cv.drawRect(r, pBack)
+            if (duration > 0) { r.right = xOf(buffered); cv.drawRect(r, pBuf); r.right = knobX(); cv.drawRect(r, pPlay) }
+        } else {
+            val gap = 2f * d
+            val bufX = xOf(buffered); val playX = knobX()
+            pieces.forEachIndexed { i, p ->
+                val x0 = xOf(p.first) + if (i > 0) gap / 2 else 0f
+                val x1 = xOf(p.last + 1) - if (i < pieces.size - 1) gap / 2 else 0f
+                if (x1 <= x0) return@forEachIndexed
+                r.set(x0, cy - th / 2, x1, cy + th / 2); cv.drawRect(r, pBack)
+                if (bufX > x0) { r.right = minOf(x1, bufX); cv.drawRect(r, pBuf) }
+                if (playX > x0) { r.right = minOf(x1, playX); cv.drawRect(r, pPlay) }
+            }
         }
+        if (duration > 0 && (showKnob || scrubbing)) cv.drawCircle(knobX(), cy, if (scrubbing) 9f * d else 6f * d, pPlay)
     }
 
     override fun onTouchEvent(e: MotionEvent): Boolean {

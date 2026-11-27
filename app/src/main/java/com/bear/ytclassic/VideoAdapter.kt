@@ -39,6 +39,8 @@ class VideoAdapter(
     private val onMore: ((View, VideoItem) -> Unit)? = null,
     /** Playlists keep deleted / private videos (dimmed) even with "ซ่อนวิดีโอที่ดูไม่ได้" on. */
     private val canHide: Boolean = true,
+    /** Long-press a video card opens the same menu as its ⋮ button (Home). */
+    private val longPressMenu: Boolean = false,
     private val onClick: (VideoItem) -> Unit,
 ) : RecyclerView.Adapter<RecyclerView.ViewHolder>() {
     val items = ArrayList<VideoItem>()
@@ -61,6 +63,22 @@ class VideoAdapter(
         }
 
     fun set(list: List<VideoItem>) { hiding = canHide && Prefs.hideUnplayable; raw.clear(); raw.addAll(list); items.clear(); items.addAll(visible(list)); notifyDataSetChanged() }
+    /** Removes matching videos now; returns them with their positions so [restore] can undo. */
+    fun removeWhere(pred: (VideoItem) -> Boolean): List<Pair<Int, VideoItem>> {
+        val gone = items.withIndex().filter { pred(it.value) }.map { it.index to it.value }
+        if (gone.isEmpty()) return gone
+        raw.removeAll { pred(it) }
+        gone.asReversed().forEach { (i, _) -> items.removeAt(i); notifyItemRemoved(i) }
+        return gone
+    }
+
+    fun restore(gone: List<Pair<Int, VideoItem>>) {
+        gone.forEach { (i, v) ->
+            val at = i.coerceIn(0, items.size)
+            items.add(at, v); raw.add(at.coerceAtMost(raw.size), v); notifyItemInserted(at)
+        }
+    }
+
     fun add(list: List<VideoItem>) { raw.addAll(list); val v = visible(list); val s = items.size; items.addAll(v); notifyItemRangeInserted(s, v.size) }
 
     override fun getItemCount() = items.size + if (loadingMore) 1 else 0
@@ -88,6 +106,8 @@ class VideoAdapter(
 
         fun bind(it: VideoItem) {
             more?.setOnClickListener { view -> (onMore ?: { a, b -> a.showVideoMenu(b) })(view, it) }
+            if (longPressMenu && it.kind == 0) itemView.setOnLongClickListener { _ -> (onMore ?: { a, b -> a.showVideoMenu(b) })(more ?: itemView, it); true }
+            else itemView.setOnLongClickListener(null)
             val p = progress[it.url] ?: 0
             watched?.visibility = if (p > 0 && it.kind == 0) View.VISIBLE else View.GONE
             watched?.progress = p
