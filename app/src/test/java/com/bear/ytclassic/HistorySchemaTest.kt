@@ -10,5 +10,7 @@ class HistorySchemaTest {
         val ddl = Db.historyDdl("history")
         assertTrue(ddl, ddl.contains("PRIMARY KEY(url)"))
         assertFalse(ddl, ddl.contains("uploaded_ms INTEGER PRIMARY KEY"))
+        assertTrue(ddl, ddl.contains("position_ms INTEGER NOT NULL DEFAULT 0"))
+        assertTrue(ddl, ddl.contains("length_ms INTEGER NOT NULL DEFAULT 0"))
     }
 }

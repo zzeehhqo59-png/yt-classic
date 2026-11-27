@@ -18,12 +18,12 @@ object Db {
     private const val VDEF = "url TEXT NOT NULL, title TEXT, channel TEXT, channel_url TEXT, thumb TEXT, avatar TEXT, duration INTEGER, views INTEGER, uploaded_ms INTEGER"
 
     fun init(c: Context) {
-        helper = object : SQLiteOpenHelper(c.applicationContext, "ytclassic.db", null, 6) {
+        helper = object : SQLiteOpenHelper(c.applicationContext, "ytclassic.db", null, 7) {
             override fun onCreate(db: SQLiteDatabase) {
                 db.execSQL("CREATE TABLE subs (url TEXT PRIMARY KEY, name TEXT NOT NULL, avatar TEXT, subscribers INTEGER NOT NULL DEFAULT -1, added INTEGER NOT NULL)")
-                createV2(db); createV3(db); createV4(db); createV6(db)
+                createV2(db); createV3(db); createV4(db); createV6(db); createV7(db)
             }
-            override fun onUpgrade(db: SQLiteDatabase, o: Int, n: Int) { if (o < 2) createV2(db); if (o < 3) createV3(db); if (o < 4) createV4(db); if (o in 2..4) rekeyHistory(db); if (o < 6) createV6(db) }
+            override fun onUpgrade(db: SQLiteDatabase, o: Int, n: Int) { if (o < 2) createV2(db); if (o < 3) createV3(db); if (o < 4) createV4(db); if (o in 2..4) rekeyHistory(db); if (o < 6) createV6(db); if (o < 7) createV7(db) }
         }
     }
 
@@ -32,6 +32,14 @@ object Db {
 
     private fun createV6(db: SQLiteDatabase) {
         listOf("history", "likes", "playlist_items").forEach { db.execSQL(addShortFormColumnSql(it)) }
+    }
+
+    /** 6.0.3: snap nearly finished history rows to the end so they count as watched. */
+    fun markFinishedWatchProgressSql() =
+        "UPDATE history SET position_ms = length_ms WHERE length_ms > 0 AND position_ms > 0 AND position_ms >= length_ms - 15000"
+
+    private fun createV7(db: SQLiteDatabase) {
+        db.execSQL(markFinishedWatchProgressSql())
     }
 
     /** 5.0: local likes and remembered deleted / private videos. */
@@ -112,14 +120,15 @@ object History {
     }
 
     fun updatePosition(url: String, pos: Long, length: Long) {
-        Db.w.update("history", ContentValues().apply { put("position_ms", pos); if (length > 0) put("length_ms", length) }, "url=?", arrayOf(url))
+        val stored = WatchProgress.storedPosition(pos, length)
+        Db.w.update("history", ContentValues().apply { put("position_ms", stored.first); if (stored.second > 0) put("length_ms", stored.second) }, "url=?", arrayOf(url))
     }
 
     fun position(url: String): Long = Db.r.rawQuery("SELECT position_ms FROM history WHERE url=?", arrayOf(url)).use { if (it.moveToFirst()) it.getLong(0) else 0 }
 
     /** url -> watched fraction 0..1000 */
     fun progressMap(): Map<String, Int> = Db.r.rawQuery("SELECT url, position_ms, length_ms FROM history WHERE length_ms > 0 AND position_ms > 0", null).use { c ->
-        buildMap { while (c.moveToNext()) put(c.getString(0), (c.getLong(1) * 1000 / c.getLong(2)).toInt().coerceIn(0, 1000)) }
+        buildMap { while (c.moveToNext()) put(c.getString(0), WatchProgress.bar(c.getLong(1), c.getLong(2))) }
     }
 
     fun marks(urls: List<String>): List<SeriesSeasons.WatchMark> {

@@ -56,6 +56,7 @@ class SubsFragment : Fragment() {
 
     override fun onResume() {
         super.onResume()
+        if (::videos.isInitialized) videos.refreshProgress()
         if (!isHidden && loadedVersion != -1L && loadedVersion != Subs.version) load(force = false)
     }
 

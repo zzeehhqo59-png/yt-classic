@@ -101,6 +101,7 @@ object Playback {
                         if (s == Player.STATE_READY && System.currentTimeMillis() - lastRetryAt > 60_000) retries = 0
                         if (s == Player.STATE_ENDED) {
                             _state.value.item?.let { val d = p.duration; if (d > 0) History.updatePosition(it.url, d, d) }
+                            if (SleepTimer.onVideoEnded()) return
                             offerAutoplay()
                         }
                     }
@@ -121,6 +122,7 @@ object Playback {
     fun init(c: Context) {
         app = c.applicationContext
         NetworkWatch(app) { recoverIfNeeded() }.start()
+        SleepTimer.init { player.pause() }
     }
 
     fun recoverIfNeeded() {
@@ -271,8 +273,7 @@ object Playback {
                 val def = defaultIndex()
                 val saved = if (live) 0 else History.position(item.url)
                 val durMs = full.durationSec * 1000
-                val start = if (saved > 5000 && (durMs <= 0 || saved < durMs - 15_000)) saved else 0
-                play(def, start)
+                play(def, WatchProgress.resumeAt(saved, durMs))
             } catch (e: CancellationException) { throw e
             } catch (e: Throwable) {
                 _state.value = _state.value.copy(loading = false, error = Errors.video(e, item))
@@ -340,10 +341,11 @@ object Playback {
         runCatching { ContextCompat.startForegroundService(app, Intent(app, PlaybackService::class.java)) }
         val saved = History.position(item.url)
         val durMs = item.durationSec * 1000
-        play(0, if (saved > 5000 && (durMs <= 0 || saved < durMs - 15_000)) saved else 0)
+        play(0, WatchProgress.resumeAt(saved, durMs))
     }
 
     fun close() {
+        SleepTimer.clear()
         cancelAutoplay()
         savePosition()
         back.clear()

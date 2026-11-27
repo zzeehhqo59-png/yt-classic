@@ -18,6 +18,7 @@ object SeriesSeasons {
         val number: Int?,
         val thumb: String?,
         val episodes: List<VideoItem>,
+        val episodeCount: Int = 0,
     )
 
     data class WatchMark(val url: String, val positionMs: Long, val lengthMs: Long, val watchedAt: Long)
@@ -76,5 +77,80 @@ object SeriesSeasons {
             s.episodes.forEachIndexed { ei, ep -> if (ei >= start && PlayQueue.isPlayable(ep)) out += ep }
         }
         return out
+    }
+
+
+    private val BRACKETS = Regex("""[\[【(（][^\]】)）]*[\]】)）]""")
+    private val EPISODE = Regex("""(?:ตอนที่?|episode|ep\.?)\s*\d+""", RegexOption.IGNORE_CASE)
+    private val SEASON_STRIP = Regex(
+        """(?:ซีซั[่้]*[น่น][่้]*\s*(?:ที่)?\s*\d+|season\s*\d+|(?<!\w)s\d{1,2}(?!\d))""",
+        RegexOption.IGNORE_CASE,
+    )
+    private val EDITION_WORDS = Regex("""พากย์ไทย|ซับไทย|พากย์|ซับ|\bdub\b|\bsub\b""", RegexOption.IGNORE_CASE)
+    private val NON_ALNUM = Regex("""[^\p{L}\p{N}]+""")
+
+    fun editionOf(title: String): String {
+        val t = title.lowercase()
+        return when {
+            "พากย์" in t || Regex("""\bdub\b""", RegexOption.IGNORE_CASE).containsMatchIn(title) -> "dub"
+            "ซับ" in t || Regex("""\bsub\b""", RegexOption.IGNORE_CASE).containsMatchIn(title) -> "sub"
+            else -> ""
+        }
+    }
+
+    fun baseTitle(title: String): String {
+        var s = title
+        s = BRACKETS.replace(s, " ")
+        s = SEASON_STRIP.replace(s, " ")
+        s = EPISODE.replace(s, " ")
+        s = EDITION_WORDS.replace(s, " ")
+        return NON_ALNUM.replace(s, "").lowercase()
+    }
+
+    fun sameSeries(a: String, b: String): Boolean {
+        val left = baseTitle(a)
+        val right = baseTitle(b)
+        if (left.isBlank() || right.isBlank()) return false
+        return left == right && editionOf(a) == editionOf(b)
+    }
+
+    /** Playlists of the same series (and same dub/sub), missing numbers count as season 1, duplicates dropped. */
+    fun ofCurrent(current: Season, candidates: List<Season>): List<Season> {
+        val preferred = current.url
+        val pool = LinkedHashMap<String, Season>()
+        fun keep(s: Season) {
+            val count = if (s.episodeCount > 0) s.episodeCount else s.episodes.size
+            val next = if (count != s.episodeCount) s.copy(episodeCount = count) else s
+            val prev = pool[next.url]
+            if (prev == null || (prev.episodes.isEmpty() && next.episodes.isNotEmpty()) || next.episodeCount > prev.episodeCount) {
+                pool[next.url] = next
+            }
+        }
+        keep(current)
+        candidates.forEach { keep(it) }
+        val matched = pool.values.filter { it.url == preferred || sameSeries(current.title, it.title) }
+            .map { it.copy(number = parseNumber(it.title) ?: 1) }
+        val byNum = LinkedHashMap<Int, Season>()
+        for (s in matched) {
+            val n = s.number ?: 1
+            val prev = byNum[n]
+            byNum[n] = when {
+                prev == null -> s
+                s.url == preferred -> s
+                prev.url == preferred -> prev
+                s.episodes.isNotEmpty() && prev.episodes.isEmpty() -> s
+                s.episodeCount > prev.episodeCount -> s
+                else -> prev
+            }
+        }
+        return sort(byNum.values.toList())
+    }
+
+    fun showSeasonPicker(seasons: List<Season>): Boolean = seasons.size > 1
+
+    fun sheetLabel(season: Season): String {
+        val name = seasonLabel(season.number, season.title)
+        val n = if (season.episodeCount > 0) season.episodeCount else season.episodes.size
+        return if (n > 0) "$name · $n ตอน" else name
     }
 }

@@ -265,7 +265,7 @@ class WatchControls(private val a: AppCompatActivity, private val root: View, pr
         }
     }
 
-    /** ⚙: คุณภาพ / ความเร็วในการเล่น / คำบรรยาย / แทร็กเสียง. */
+    /** ⚙: คุณภาพ / ความเร็วในการเล่น / คำบรรยาย / แทร็กเสียง / ตั้งเวลาปิด. */
     private fun settingsSheet() {
         playerView.removeCallbacks(hideCtl)
         val q = qualities.getOrNull(Playback.current)?.label ?: "—"
@@ -279,11 +279,16 @@ class WatchControls(private val a: AppCompatActivity, private val root: View, pr
             tracks.audioSummary()?.let { audio ->
                 box.sheetRow(R.drawable.ic_audio, "แทร็กเสียง", audio, end = chevron()) { dlg.dismiss(); tracks.audioSheet() }
             }
+            box.sheetRow(R.drawable.ic_timer, "ตั้งเวลาปิด", SleepTimer.summary(), end = chevron()) { dlg.dismiss(); sleepSheet() }
         }
         d.setOnDismissListener { scheduleHide() }
     }
     private fun chevron() = ImageView(a).apply {
         setImageResource(R.drawable.ic_chevron_right); setColorFilter(androidx.core.content.ContextCompat.getColor(context, R.color.text2))
+    }
+    private fun sleepSheet() {
+        val labels = listOf("ปิด") + SleepTimer.MINUTE_OPTIONS.map { "$it นาที" } + listOf("ถึงจบตอนนี้")
+        a.choiceSheet("ตั้งเวลาปิด", labels, SleepTimer.optionIndex()) { SleepTimer.applyOption(it) }
     }
     private fun speedSheet() {
         val cur = player.playbackParameters.speed

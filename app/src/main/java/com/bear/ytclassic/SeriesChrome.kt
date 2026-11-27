@@ -30,7 +30,7 @@ class SeriesHeroAdapter(
             visibility = if (st.owner.isNullOrBlank()) View.GONE else View.VISIBLE
         }
         val chip = v.findViewById<TextView>(R.id.btnSeason)
-        chip.visibility = if (st.seasons.isEmpty()) View.GONE else View.VISIBLE
+        chip.visibility = if (SeriesSeasons.showSeasonPicker(st.seasons)) View.VISIBLE else View.GONE
         chip.text = season?.let { SeriesSeasons.seasonLabel(it.number, it.title) }.orEmpty()
         chip.setOnClickListener { onSeason() }
         val play = v.findViewById<TextView>(R.id.btnPlay)
@@ -86,7 +86,7 @@ fun android.content.Context.seasonSheet(seasons: List<SeriesSeasons.Season>, sel
     val pad = (20 * resources.displayMetrics.density).toInt()
     seasons.forEachIndexed { i, s ->
         val tv = TextView(this).apply {
-            text = SeriesSeasons.seasonLabel(s.number, s.title)
+            text = SeriesSeasons.sheetLabel(s)
             textSize = 16f
             setPadding(pad, pad / 2, pad, pad / 2)
             setTextColor(ContextCompat.getColor(context, if (i == selected) R.color.text1 else R.color.text2))

@@ -44,12 +44,13 @@ class SeriesViewModel : ViewModel() {
                 val owner = pe?.let { runCatching { it.uploaderName }.getOrNull() }
                 val ownerUrl = pe?.let { runCatching { it.uploaderUrl }.getOrNull() } ?: channelUrl
                 val thumb = pe?.let { runCatching { it.thumbnails.pick(720) }.getOrNull() } ?: items.firstOrNull()?.thumb
-                val current = SeriesSeasons.Season(playlistUrl, name, SeriesSeasons.parseNumber(name), thumb, items)
+                val peCount = pe?.let { runCatching { it.streamCount.toInt() }.getOrDefault(-1) } ?: -1
+                val current = SeriesSeasons.Season(playlistUrl, name, SeriesSeasons.parseNumber(name), thumb, items, if (peCount > 0) peCount else items.size)
                 var seasons = listOf(current)
                 val channel = ownerUrl?.takeIf { it.isNotBlank() }
                 if (channel != null) {
                     val others = runCatching { loadChannelPlaylists(channel, current) }.getOrDefault(emptyList())
-                    if (others.isNotEmpty()) seasons = SeriesSeasons.sort(merge(current, others))
+                    seasons = SeriesSeasons.ofCurrent(current, others)
                 }
                 val idx = seasons.indexOfFirst { it.url == playlistUrl }.coerceAtLeast(0)
                 val resume = SeriesSeasons.resume(seasons, History.marks(seasons.flatMap { it.episodes.map { e -> e.url } }))
@@ -124,18 +125,6 @@ class SeriesViewModel : ViewModel() {
 
     private fun marksOf(seasons: List<SeriesSeasons.Season>) = History.marks(seasons.flatMap { s -> s.episodes.map { it.url } })
 
-    private fun merge(current: SeriesSeasons.Season, others: List<SeriesSeasons.Season>): List<SeriesSeasons.Season> {
-        val out = ArrayList<SeriesSeasons.Season>()
-        val seen = HashSet<String>()
-        (listOf(current) + others).forEach { s ->
-            if (s.url in seen) {
-                val i = out.indexOfFirst { it.url == s.url }
-                if (i >= 0 && out[i].episodes.isEmpty() && s.episodes.isNotEmpty()) out[i] = s
-            } else { seen += s.url; out += s }
-        }
-        return out
-    }
-
     private suspend fun loadChannelPlaylists(channelUrl: String, current: SeriesSeasons.Season): List<SeriesSeasons.Season> =
         withContext(Dispatchers.IO) {
             val pager = Repo.channelTab(channelUrl, ChannelTabs.PLAYLISTS)
@@ -144,7 +133,7 @@ class SeriesViewModel : ViewModel() {
             do { items += pager.next(); guard++ } while (pager.hasMore && guard < 5)
             items.filter { it.kind == 2 && it.url.isNotBlank() }.map { pl ->
                 if (pl.url == current.url) current
-                else SeriesSeasons.Season(pl.url, pl.title, SeriesSeasons.parseNumber(pl.title), pl.thumb, emptyList())
+                else SeriesSeasons.Season(pl.url, pl.title, SeriesSeasons.parseNumber(pl.title), pl.thumb, emptyList(), pl.count.toInt())
             }
         }
 
@@ -155,6 +144,7 @@ class SeriesViewModel : ViewModel() {
         val pe = pager.extractor as? PlaylistExtractor
         val name = runCatching { pager.extractor.name }.getOrNull() ?: season.title
         val thumb = pe?.let { runCatching { it.thumbnails.pick(720) }.getOrNull() } ?: items.firstOrNull()?.thumb ?: season.thumb
-        season.copy(title = name, number = SeriesSeasons.parseNumber(name) ?: season.number, thumb = thumb, episodes = items)
+        val count = pe?.let { runCatching { it.streamCount.toInt() }.getOrDefault(-1) }?.takeIf { it > 0 } ?: items.size
+        season.copy(title = name, number = SeriesSeasons.parseNumber(name) ?: season.number, thumb = thumb, episodes = items, episodeCount = count)
     }
 }

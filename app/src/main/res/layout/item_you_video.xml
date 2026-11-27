@@ -6,6 +6,8 @@
     <TextView android:id="@+id/duration" android:layout_width="wrap_content" android:layout_height="wrap_content"
         android:layout_gravity="bottom|end" android:layout_margin="4dp" android:background="@drawable/bg_duration"
         android:paddingStart="4dp" android:paddingEnd="4dp" android:textColor="#FFFFFF" android:textSize="10sp" android:textStyle="bold"/>
+    <ProgressBar android:id="@+id/watched" style="?android:attr/progressBarStyleHorizontal" android:layout_width="match_parent" android:layout_height="3dp"
+        android:layout_gravity="bottom" android:progressTint="#FF0000" android:progressBackgroundTint="#80FFFFFF" android:max="1000" android:visibility="gone"/>
   </FrameLayout>
   <TextView android:id="@+id/title" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="4dp"
       android:maxLines="2" android:ellipsize="end" android:textColor="@color/text1" android:textSize="12sp"/>

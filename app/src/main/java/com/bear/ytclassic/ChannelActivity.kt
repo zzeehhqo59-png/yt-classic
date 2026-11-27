@@ -61,6 +61,11 @@ class ChannelActivity : YtActivity() {
         vm.load(url, intent.getStringExtra("name").orEmpty(), intent.getStringExtra("avatar"))
     }
 
+    override fun onResume() {
+        super.onResume()
+        pagerAdapter?.bindVisible(vm.ui.value)
+    }
+
     private fun render(st: ChannelUiState) {
         findViewById<View>(R.id.progress).visibility = if (st.loading && st.tabs.isEmpty()) View.VISIBLE else View.GONE
         val msg = findViewById<TextView>(R.id.message)
@@ -110,6 +115,8 @@ class ChannelActivity : YtActivity() {
             featured.item = if (tabId == ChannelPage.HOME && st.selectedTab == tabId) st.featured else null
             videos.loadingMore = st.selectedTab == tabId && st.loadingMore
             if (st.selectedTab == tabId) videos.set(st.items)
+            videos.refreshProgress()
+            featured.applyProgress(videos.progress)
         }
         if (list.getTag(R.id.pager) != tabId) {
             list.clearOnScrollListeners()

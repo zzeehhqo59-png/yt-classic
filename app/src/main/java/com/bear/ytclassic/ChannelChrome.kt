@@ -7,6 +7,7 @@ import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import android.widget.ImageView
+import android.widget.ProgressBar
 import android.widget.LinearLayout
 import android.widget.TextView
 import androidx.core.content.ContextCompat
@@ -100,6 +101,11 @@ class FeaturedAdapter(private val onClick: (VideoItem) -> Unit) : RecyclerView.A
                 v != null && was -> notifyItemChanged(0)
             }
         }
+    var progress: Map<String, Int> = emptyMap()
+    fun applyProgress(map: Map<String, Int>) {
+        progress = map
+        if (item != null) notifyItemChanged(0)
+    }
     override fun getItemCount() = if (item == null) 0 else 1
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int) = object : RecyclerView.ViewHolder(
         LayoutInflater.from(parent.context).inflate(R.layout.item_featured, parent, false)
@@ -117,6 +123,10 @@ class FeaturedAdapter(private val onClick: (VideoItem) -> Unit) : RecyclerView.A
         v.findViewById<TextView>(R.id.title).text = video.title
         v.findViewById<TextView>(R.id.meta).text = listOf(Fmt.views(video.views, video.live), Fmt.ageMs(video.uploadedMs, video.age).takeUnless { _ -> video.live }.orEmpty())
             .filter { s -> s.isNotBlank() }.joinToString(" · ")
+        val p = progress[video.url] ?: 0
+        val watched = v.findViewById<ProgressBar>(R.id.watched)
+        watched.visibility = if (p > 0 && !video.live) View.VISIBLE else View.GONE
+        watched.progress = p
         v.setOnClickListener { onClick(video) }
         v.findViewById<View>(R.id.more).setOnClickListener { view -> view.showVideoMenu(video) }
     }
