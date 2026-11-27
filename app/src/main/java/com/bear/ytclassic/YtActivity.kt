@@ -12,6 +12,7 @@ open class YtActivity : AppCompatActivity() {
     fun attachPlayerUi() {
         WatchLayer.attach(this)
         MiniPlayerBar.attach(this)
+        ScreenAwake.bind(this)
     }
 
     override fun onUserLeaveHint() {
