@@ -29,6 +29,7 @@ object Downloads {
     data class Dl(
         val id: Long, val url: String, val title: String, val channel: String, val thumb: String?, val durationSec: Long,
         val audioOnly: Boolean, val height: Int, val status: Int, val done: Long, val total: Long, val file: String?, val error: String?,
+        val created: Long = 0,
     ) {
         val percent get() = if (total > 0) (done * 100 / total).toInt().coerceIn(0, 100) else 0
         val quality get() = if (audioOnly) "เสียง m4a" else "${height}p"
@@ -43,9 +44,9 @@ object Downloads {
     fun dir(c: Context): File = File(c.getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS) ?: File(c.filesDir, "downloads"), "YT Classic").apply { mkdirs() }
     fun tmpDir(c: Context): File = File(dir(c), ".tmp").apply { mkdirs() }
 
-    private const val COLS = "id,url,title,channel,thumb,duration,audio_only,height,status,done_bytes,total_bytes,file,error"
+    private const val COLS = "id,url,title,channel,thumb,duration,audio_only,height,status,done_bytes,total_bytes,file,error,created"
     private fun read(c: android.database.Cursor) = Dl(c.getLong(0), c.getString(1), c.getString(2).orEmpty(), c.getString(3).orEmpty(), c.getString(4), c.getLong(5),
-        c.getInt(6) != 0, c.getInt(7), c.getInt(8), c.getLong(9), c.getLong(10), c.getString(11), c.getString(12))
+        c.getInt(6) != 0, c.getInt(7), c.getInt(8), c.getLong(9), c.getLong(10), c.getString(11), c.getString(12), c.getLong(13))
 
     fun all(): List<Dl> = Db.r.rawQuery("SELECT $COLS FROM downloads ORDER BY id DESC", null).use { c -> buildList { while (c.moveToNext()) add(read(c)) } }
     fun get(id: Long): Dl? = Db.r.rawQuery("SELECT $COLS FROM downloads WHERE id=?", arrayOf("$id")).use { c -> if (c.moveToFirst()) read(c) else null }

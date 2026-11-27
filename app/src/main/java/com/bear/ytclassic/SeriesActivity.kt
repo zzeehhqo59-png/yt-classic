@@ -22,9 +22,8 @@ class SeriesActivity : YtActivity() {
     }
 
     private val vm: SeriesViewModel by viewModels()
-    private val hero = SeriesHeroAdapter({ vm.ui.value }, onPlay = { play(null) }, onSeason = { openSeasons() })
+    private val hero = SeriesHeroAdapter({ vm.ui.value }, onPlay = { play(null) })
     private val episodes = EpisodeAdapter { _, index -> play(index) }
-    private var boundSeason = -1
     private var boundEps: List<VideoItem> = emptyList()
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -44,62 +43,38 @@ class SeriesActivity : YtActivity() {
         lifecycleScope.launch {
             repeatOnLifecycle(Lifecycle.State.STARTED) { vm.ui.collect { render(it) } }
         }
-        vm.load(url, intent.getStringExtra("title").orEmpty(), intent.getStringExtra("channelUrl"))
+        vm.load(url, intent.getStringExtra("title").orEmpty())
     }
 
     override fun onResume() {
         super.onResume()
         episodes.progress = History.progressMap()
         if (boundEps.isNotEmpty()) episodes.notifyDataSetChanged()
+        vm.refreshResume()
     }
 
     private fun render(st: SeriesUi) {
-        findViewById<View>(R.id.progress).visibility = if (st.loading && st.seasons.isEmpty()) View.VISIBLE else View.GONE
+        findViewById<View>(R.id.progress).visibility = if (st.loading && st.episodes.isEmpty()) View.VISIBLE else View.GONE
         val msg = findViewById<TextView>(R.id.message)
         msg.text = st.error.orEmpty()
-        msg.visibility = if (st.error != null && st.seasons.isEmpty()) View.VISIBLE else View.GONE
+        msg.visibility = if (st.error != null && st.episodes.isEmpty()) View.VISIBLE else View.GONE
         if (st.title.isNotBlank()) findViewById<TextView>(R.id.barTitle).text = st.title
-        val season = st.seasons.getOrNull(st.seasonIndex)
-        val eps = season?.episodes.orEmpty()
         episodes.loadingMore = st.loadingMore
         episodes.progress = History.progressMap()
-        if (boundSeason != st.seasonIndex || boundEps != eps) {
-            boundSeason = st.seasonIndex
-            boundEps = eps
-            episodes.set(eps, season?.number)
+        if (boundEps != st.episodes) {
+            boundEps = st.episodes
+            episodes.set(st.episodes)
         }
         hero.notifyItemChanged(0)
     }
 
-    private fun openSeasons() {
-        val st = vm.ui.value
-        if (st.seasons.isEmpty()) return
-        seasonSheet(st.seasons, st.seasonIndex) { vm.selectSeason(it) }
-    }
-
     private fun play(episodeIndex: Int?) {
         lifecycleScope.launch {
-            val start = episodeIndex ?: -1
-            vm.fillForPlayback(vm.ui.value.seasonIndex)
+            vm.fillForPlayback()
             val st = vm.ui.value
-            val seasons = st.seasons
-            if (seasons.isEmpty()) return@launch
-            val si: Int
-            val ei: Int
-            if (start >= 0) {
-                si = st.seasonIndex; ei = start
-            } else {
-                val resume = st.resume
-                val found = resume?.let { target ->
-                    seasons.indices.firstNotNullOfOrNull { i ->
-                        seasons[i].episodes.indexOfFirst { it.url == target.url }.takeIf { it >= 0 }?.let { i to it }
-                    }
-                }
-                if (found != null) { si = found.first; ei = found.second }
-                else { si = st.seasonIndex; ei = 0 }
-            }
-            val queue = SeriesSeasons.queueFrom(seasons, si, ei)
-            val first = PlayQueue.start(queue, 0)
+            if (st.episodes.isEmpty()) return@launch
+            val start = episodeIndex ?: SeriesEpisodes.startIndex(st.episodes, st.resume)
+            val first = PlayQueue.start(SeriesEpisodes.queueFrom(st.episodes, start), 0)
             if (first == null) Toast.makeText(this@SeriesActivity, "ไม่มีตอนที่เล่นได้", Toast.LENGTH_SHORT).show()
             else openVideo(first)
         }

@@ -131,7 +131,7 @@ object History {
         buildMap { while (c.moveToNext()) put(c.getString(0), WatchProgress.bar(c.getLong(1), c.getLong(2))) }
     }
 
-    fun marks(urls: List<String>): List<SeriesSeasons.WatchMark> {
+    fun marks(urls: List<String>): List<SeriesEpisodes.WatchMark> {
         if (urls.isEmpty()) return emptyList()
         return urls.chunked(500).flatMap { part ->
             Db.r.rawQuery(
@@ -139,7 +139,7 @@ object History {
                 part.toTypedArray(),
             ).use { c ->
                 buildList {
-                    while (c.moveToNext()) add(SeriesSeasons.WatchMark(c.getString(0), c.getLong(1), c.getLong(2), c.getLong(3)))
+                    while (c.moveToNext()) add(SeriesEpisodes.WatchMark(c.getString(0), c.getLong(1), c.getLong(2), c.getLong(3)))
                 }
             }
         }
@@ -169,12 +169,13 @@ object History {
 
 object Playlists {
     const val WATCH_LATER = 1L
-    data class Pl(val id: Long, val name: String, val count: Int, val thumb: String?)
+    data class Pl(val id: Long, val name: String, val count: Int, val thumb: String?, val latest: Long = 0)
 
     fun all(): List<Pl> = Db.r.rawQuery(
         "SELECT p.id, p.name, (SELECT COUNT(*) FROM playlist_items i WHERE i.playlist_id=p.id), " +
-            "(SELECT thumb FROM playlist_items i WHERE i.playlist_id=p.id ORDER BY added DESC LIMIT 1) FROM playlists p ORDER BY p.id", null
-    ).use { c -> buildList { while (c.moveToNext()) add(Pl(c.getLong(0), c.getString(1), c.getInt(2), c.getString(3))) } }
+            "(SELECT thumb FROM playlist_items i WHERE i.playlist_id=p.id ORDER BY added DESC LIMIT 1), " +
+            "COALESCE((SELECT MAX(added) FROM playlist_items i WHERE i.playlist_id=p.id), p.created) FROM playlists p ORDER BY p.id", null
+    ).use { c -> buildList { while (c.moveToNext()) add(Pl(c.getLong(0), c.getString(1), c.getInt(2), c.getString(3), c.getLong(4))) } }
 
     fun get(id: Long): Pl? = all().firstOrNull { it.id == id }
     fun create(name: String): Long = Db.w.insert("playlists", null, ContentValues().apply { put("name", name); put("created", System.currentTimeMillis()) })

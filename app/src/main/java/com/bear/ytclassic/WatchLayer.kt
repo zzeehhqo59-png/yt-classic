@@ -89,17 +89,15 @@ class WatchLayer private constructor(private val a: AppCompatActivity, private v
     private val playerLoading: View = root.findViewById(R.id.playerLoading)
     private val btnMinimize: View = root.findViewById(R.id.btnMinimize)
     private val list: RecyclerView = root.findViewById(R.id.list)
-    private val header: WatchHeaderAdapter = WatchHeaderAdapter(a, object : WatchHeaderAdapter.Callbacks {
-        override fun openComments() { this@WatchLayer.openComments() }
-        override fun moreSheet() { moreSheet() }
-        override fun share() { a.shareUrl(item.url) }
-        override fun save() { a.saveToPlaylist(item) }
-        override fun rating() = Likes.state(item.url)
-        override fun rate(value: Int) { this@WatchLayer.rate(value) }
-        override fun onComments(title: String?, preview: String?, avatar: String?) {
-            if (::ctl.isInitialized) ctl.updateLandComments(title, preview, avatar)
-        }
-    })
+    private val header: WatchHeaderAdapter = WatchHeaderAdapter(a, WatchHeaderBridge(
+        onMore = { moreSheet() },
+        onComments = { openComments() },
+        onShare = { a.shareUrl(item.url) },
+        onSave = { a.saveToPlaylist(item) },
+        currentRating = { Likes.state(item.url) },
+        onRate = { rate(it) },
+        onCommentsChanged = { t, p, av -> if (::ctl.isInitialized) ctl.updateLandComments(t, p, av) },
+    ))
     private val comments: WatchComments = WatchComments(a) { t, p, av -> header.setComments(t, p, av) }
     private lateinit var ctl: WatchControls
     private lateinit var shrink: WatchMinimize

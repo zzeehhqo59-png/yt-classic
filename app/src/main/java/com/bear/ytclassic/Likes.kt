@@ -36,6 +36,8 @@ object Likes {
         buildList { while (c.moveToNext()) add(Db.video(c)) }
     }
 
+    /** Time of the most recent like, 0 if none. */
+    fun latest(): Long = Db.r.rawQuery("SELECT COALESCE(MAX(at), 0) FROM likes WHERE value=1", null).use { it.moveToFirst(); it.getLong(0) }
     fun count(): Int = Db.r.rawQuery("SELECT COUNT(*) FROM likes WHERE value=1", null).use { it.moveToFirst(); it.getInt(0) }
 
     @Volatile var version = 0L
