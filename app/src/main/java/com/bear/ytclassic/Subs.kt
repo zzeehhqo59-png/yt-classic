@@ -7,7 +7,6 @@ import android.database.sqlite.SQLiteOpenHelper
 import android.net.Uri
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
-import org.json.JSONObject
 import org.schabi.newpipe.extractor.ServiceList
 
 data class Channel(val url: String, val name: String, val avatar: String?, val subscribers: Long = -1)
@@ -91,44 +90,17 @@ object Subs {
 
     /** NewPipe subscriptions export (JSON) or YouTube Takeout subscriptions.csv. */
     suspend fun importFile(c: Context, uri: Uri): ImportResult = withContext(Dispatchers.IO) {
-        val text = c.contentResolver.openInputStream(uri)!!.use { it.readBytes().toString(Charsets.UTF_8) }.removePrefix("\uFEFF")
-        val list = if (text.trimStart().startsWith("{")) parseNewPipe(text) else parseTakeoutCsv(text)
+        val stream = c.contentResolver.openInputStream(uri) ?: throw IllegalArgumentException("cannot open file")
+        val list = SubsFormat.parse(stream.use { it.readBytes().toString(Charsets.UTF_8) })
         if (list.isEmpty()) throw IllegalArgumentException("no channels")
         addAll(list)
     }
 
-    private fun parseNewPipe(text: String): List<Channel> {
-        val arr = JSONObject(text).getJSONArray("subscriptions")
-        return (0 until arr.length()).mapNotNull { i ->
-            val o = arr.getJSONObject(i)
-            if (o.optInt("service_id", 0) != 0) return@mapNotNull null
-            val url = o.optString("url"); if (url.isBlank()) null else Channel(url, o.optString("name"), null)
-        }
-    }
-
-    private fun parseTakeoutCsv(text: String): List<Channel> {
-        val rows = text.lines().filter { it.isNotBlank() }.map { csvRow(it) }
-        return rows.mapNotNull { r ->
-            val id = r.getOrNull(0)?.trim().orEmpty()
-            if (!id.startsWith("UC")) return@mapNotNull null   // skips the header row (any language)
-            val url = r.getOrNull(1)?.trim()?.takeIf { it.startsWith("http") } ?: "https://www.youtube.com/channel/$id"
-            Channel(url, r.getOrNull(2)?.trim().orEmpty(), null)
-        }
-    }
-
-    private fun csvRow(line: String): List<String> {
-        val out = ArrayList<String>(); val sb = StringBuilder(); var q = false; var i = 0
-        while (i < line.length) {
-            val ch = line[i]
-            when {
-                q && ch == '"' && i + 1 < line.length && line[i + 1] == '"' -> { sb.append('"'); i++ }
-                ch == '"' -> q = !q
-                ch == ',' && !q -> { out.add(sb.toString()); sb.clear() }
-                else -> sb.append(ch)
-            }
-            i++
-        }
-        out.add(sb.toString())
-        return out
+    /** Writes every subscription as a NewPipe JSON export (readable by [importFile] and by NewPipe). @return channel count */
+    suspend fun exportFile(c: Context, uri: Uri): Int = withContext(Dispatchers.IO) {
+        val list = all()
+        val stream = c.contentResolver.openOutputStream(uri, "wt") ?: throw IllegalArgumentException("cannot open file")
+        stream.use { it.write(SubsFormat.toNewPipeJson(list).toByteArray(Charsets.UTF_8)) }
+        list.size
     }
 }

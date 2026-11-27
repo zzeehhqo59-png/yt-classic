@@ -75,7 +75,7 @@ class SubsFragment : Fragment() {
         if (header.visible) header.notifyItemChanged(0)
         if (subs.isEmpty()) {
             videos.set(emptyList()); refresh.isRefreshing = false; progress.visibility = View.GONE
-            text.text = "ยังไม่ได้ติดตามช่องใด\n\nกด \"ติดตาม\" ในหน้าวิดีโอหรือหน้าช่อง\nหรือนำเข้าการติดตามจากไฟล์ในแท็บคุณ"
+            text.text = "ยังไม่ได้ติดตามช่องใด\n\nกด \"ติดตาม\" ในหน้าวิดีโอหรือหน้าช่อง\nหรือนำเข้าการติดตามจากไฟล์ในการตั้งค่า (ไอคอนเฟืองมุมขวาบน)"
             retry.visibility = View.GONE; box.visibility = View.VISIBLE
             return
         }

@@ -70,19 +70,19 @@ class Features604Test {
     )
 
     @Test fun chipsOnlyAppearWhenTheAppHasThatData() {
-        assertEquals(listOf(LibraryModel.Filter.RECENT), LibraryModel.filters(snapshot()))
+        assertEquals(listOf(LibraryModel.Filter.ALL), LibraryModel.filters(snapshot()))
         val full = snapshot(
             playlists = listOf(LibraryModel.PlaylistInfo(5, "อนิเมะ", 1, "p", latest = 10)),
             downloads = listOf(dl(1), dl(2, audio = true)),
         )
         assertEquals(
-            listOf(LibraryModel.Filter.RECENT, LibraryModel.Filter.DOWNLOADED, LibraryModel.Filter.PLAYLISTS, LibraryModel.Filter.MUSIC),
+            listOf(LibraryModel.Filter.ALL, LibraryModel.Filter.DOWNLOADED, LibraryModel.Filter.PLAYLISTS, LibraryModel.Filter.MUSIC),
             LibraryModel.filters(full),
         )
-        assertEquals(listOf("ล่าสุด", "ดาวน์โหลดแล้ว", "เพลย์ลิสต์", "เพลง"), LibraryModel.filters(full).map { it.label })
+        assertEquals(listOf("ล่าสุด ▾", "ดาวน์โหลดแล้ว", "เพลย์ลิสต์", "เพลง"), LibraryModel.filters(full).map { LibraryModel.chipLabel(it, LibraryModel.Sort.RECENT) })
         assertFalse(LibraryModel.Filter.MUSIC in LibraryModel.filters(snapshot(downloads = listOf(dl(1)))))
         // A chip whose data disappeared falls back to ล่าสุด
-        assertEquals(LibraryModel.Filter.RECENT, LibraryModel.effective(snapshot(), LibraryModel.Filter.MUSIC))
+        assertEquals(LibraryModel.Filter.ALL, LibraryModel.effective(snapshot(), LibraryModel.Filter.MUSIC))
     }
 
     @Test fun recentRowsSortByLatestActivityAndEndWithCreate() {
@@ -91,7 +91,7 @@ class Features604Test {
             downloads = listOf(dl(9, created = 45)),
             likedCount = 3,
         )
-        val rows = LibraryModel.rows(s, LibraryModel.Filter.RECENT)
+        val rows = LibraryModel.rows(s, LibraryModel.Filter.ALL)
         assertEquals(
             listOf(LibraryModel.Kind.PLAYLIST, LibraryModel.Kind.DOWNLOADS, LibraryModel.Kind.LIKED, LibraryModel.Kind.WATCH_LATER, LibraryModel.Kind.CREATE),
             rows.map { it.kind },
@@ -104,7 +104,7 @@ class Features604Test {
     }
 
     @Test fun emptyCollectionsSayEmpty() {
-        val rows = LibraryModel.rows(snapshot(), LibraryModel.Filter.RECENT)
+        val rows = LibraryModel.rows(snapshot(), LibraryModel.Filter.ALL)
         assertEquals("ยังว่าง", rows.first { it.kind == LibraryModel.Kind.LIKED }.meta)
         assertFalse(rows.any { it.kind == LibraryModel.Kind.DOWNLOADS && it.meta.isEmpty() })
         assertEquals("ยังไม่มีวิดีโอที่ดาวน์โหลด", LibraryModel.emptyText(LibraryModel.Filter.DOWNLOADED))
@@ -115,9 +115,10 @@ class Features604Test {
         val s = snapshot(downloads = listOf(dl(1), dl(2, audio = true)))
         assertEquals(listOf(1L, 2L), LibraryModel.downloads(s, LibraryModel.Filter.DOWNLOADED).map { it.id })
         assertEquals(listOf(2L), LibraryModel.downloads(s, LibraryModel.Filter.MUSIC).map { it.id })
-        assertTrue(LibraryModel.downloads(s, LibraryModel.Filter.RECENT).isEmpty())
+        assertTrue(LibraryModel.downloads(s, LibraryModel.Filter.ALL).isEmpty())
         assertEquals(
-            listOf(LibraryModel.Kind.WATCH_LATER, LibraryModel.Kind.LIKED, LibraryModel.Kind.CREATE),
+            // 6.0.5: the playlists chip follows the sort (default ล่าสุด: liked at 40 is newer than watch later at 30)
+            listOf(LibraryModel.Kind.LIKED, LibraryModel.Kind.WATCH_LATER, LibraryModel.Kind.CREATE),
             LibraryModel.rows(s, LibraryModel.Filter.PLAYLISTS).map { it.kind },
         )
     }

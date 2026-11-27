@@ -33,7 +33,7 @@ class MainActivity : YtActivity() {
         findViewById<ImageButton>(R.id.btnSearch).setOnClickListener {
             startActivity(Intent(this, SearchActivity::class.java))
         }
-        findViewById<ImageButton>(R.id.btnAccount).setOnClickListener {
+        findViewById<ImageButton>(R.id.btnSettings).setOnClickListener {
             startActivity(Intent(this, SettingsActivity::class.java))
         }
         attachPlayerUi()

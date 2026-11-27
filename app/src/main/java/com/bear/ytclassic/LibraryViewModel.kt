@@ -13,13 +13,14 @@ import kotlinx.coroutines.withContext
 data class LibraryUi(
     val snapshot: LibraryModel.Snapshot = LibraryModel.Snapshot(),
     val downloads: List<Downloads.Dl> = emptyList(),
-    val filter: LibraryModel.Filter = LibraryModel.Filter.RECENT,
+    val filter: LibraryModel.Filter = LibraryModel.Filter.ALL,
+    val sort: LibraryModel.Sort = LibraryModel.Sort.RECENT,
     val refreshing: Boolean = false,
     val loaded: Boolean = false,
     val error: String? = null,
 ) {
     val filters get() = LibraryModel.filters(snapshot)
-    val rows get() = LibraryModel.rows(snapshot, filter)
+    val rows get() = LibraryModel.rows(snapshot, filter, sort)
     val shownDownloads: List<Downloads.Dl> get() {
         val ids = LibraryModel.downloads(snapshot, filter).map { it.id }.toSet()
         return downloads.filter { it.id in ids }
@@ -38,8 +39,9 @@ class LibraryViewModel : ViewModel() {
         job = viewModelScope.launch {
             try {
                 val (snap, dls) = withContext(Dispatchers.IO) { load() }
+                val sort = withContext(Dispatchers.IO) { LibraryModel.Sort.fromKey(Prefs.librarySort) }
                 val cur = _ui.value
-                _ui.value = cur.copy(snapshot = snap, downloads = dls, filter = LibraryModel.effective(snap, cur.filter),
+                _ui.value = cur.copy(snapshot = snap, downloads = dls, filter = LibraryModel.effective(snap, cur.filter), sort = sort,
                     refreshing = false, loaded = true, error = null)
             } catch (e: CancellationException) { throw e
             } catch (e: Throwable) {
@@ -52,6 +54,12 @@ class LibraryViewModel : ViewModel() {
     fun select(filter: LibraryModel.Filter) {
         val cur = _ui.value
         _ui.value = cur.copy(filter = LibraryModel.effective(cur.snapshot, filter))
+    }
+
+    /** Picking a sort shows all collections in that order and remembers the choice. */
+    fun setSort(sort: LibraryModel.Sort) {
+        _ui.value = _ui.value.copy(sort = sort, filter = LibraryModel.Filter.ALL)
+        viewModelScope.launch(Dispatchers.IO) { Prefs.librarySort = sort.name }
     }
 
     fun renamePlaylist(id: Long, name: String) = write { Playlists.rename(id, name) }

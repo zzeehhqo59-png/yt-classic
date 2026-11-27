@@ -24,8 +24,8 @@ android {
         applicationId = "com.bear.ytclassic"
         minSdk = 23
         targetSdk = 35
-        versionCode = 7004
-        versionName = "6.0.4"
+        versionCode = 7005
+        versionName = "6.0.5"
     }
 
     if (keystoreFile != null) {
@@ -71,6 +71,7 @@ android {
 dependencies {
     coreLibraryDesugaring("com.android.tools:desugar_jdk_libs_nio:2.1.5")
     testImplementation("junit:junit:4.13.2")
+    testImplementation("org.json:json:20260814") // real org.json for JVM unit tests (android.jar only has stubs)
     implementation("com.github.TeamNewPipe:NewPipeExtractor:v0.27.1")
     implementation("com.squareup.okhttp3:okhttp:5.5.1")
     implementation("androidx.appcompat:appcompat:1.8.0")

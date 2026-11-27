@@ -231,6 +231,10 @@ object Prefs {
     var ccFontSize: Int
         get() = p.getInt("cc_size", Captions.SIZE_NORMAL)
         set(v) { p.edit().putInt("cc_size", v).apply() }
+    /** คลังวิดีโอ sort on the คุณ page (LibraryModel.Sort name). */
+    var librarySort: String
+        get() = p.getString("library_sort", "") ?: ""
+        set(v) { p.edit().putString("library_sort", v).apply() }
     /** Preferred audio language tag (blank = original track). */
     var audioLanguage: String
         get() = p.getString("audio_lang", "") ?: ""

@@ -9,7 +9,11 @@ import android.widget.LinearLayout
 import android.widget.TextView
 import android.widget.Toast
 import androidx.appcompat.app.AlertDialog
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.core.content.ContextCompat
+import androidx.lifecycle.lifecycleScope
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.launch
 import com.google.android.material.switchmaterial.SwitchMaterial
 
 /** Settings in the style of the classic YouTube Android app: grouped sections, title + summary rows, switches on the right. */
@@ -18,6 +22,27 @@ class SettingsActivity : YtActivity() {
     private val d get() = resources.displayMetrics.density
     private fun px(v: Int) = (v * d).toInt()
     private fun color(id: Int) = ContextCompat.getColor(this, id)
+
+    private val importPicker = registerForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+        if (uri != null) transfer("นำเข้าไม่ได้: ไฟล์นี้ไม่ใช่ไฟล์การติดตามของ NewPipe (.json) หรือ subscriptions.csv จาก Takeout") {
+            val r = Subs.importFile(applicationContext, uri)
+            "นำเข้าแล้ว ${r.added} ช่อง" + if (r.existing > 0) " (ติดตามอยู่แล้ว ${r.existing} ช่อง)" else ""
+        }
+    }
+    private val exportPicker = registerForActivityResult(ActivityResultContracts.CreateDocument("application/json")) { uri ->
+        if (uri != null) transfer("ส่งออกไม่สำเร็จ") { "ส่งออกแล้ว ${Subs.exportFile(applicationContext, uri)} ช่อง" }
+    }
+
+    /** Runs a subscription import/export off the main thread and shows the result. */
+    private fun transfer(failMsg: String, work: suspend () -> String) {
+        lifecycleScope.launch {
+            val msg = try { work() } catch (e: CancellationException) { throw e } catch (e: Throwable) {
+                android.util.Log.w("Settings", "subscription transfer failed", e); failMsg
+            }
+            Toast.makeText(this@SettingsActivity, msg, Toast.LENGTH_LONG).show()
+            build()
+        }
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -94,6 +119,12 @@ class SettingsActivity : YtActivity() {
                 .setMessage("คำที่เคยค้นหาทั้งหมดจะถูกลบออกจากเครื่องนี้")
                 .setPositiveButton("ล้าง") { _, _ -> SearchHistory.clear(); Toast.makeText(this, "ล้างประวัติการค้นหาแล้ว", Toast.LENGTH_SHORT).show() }
                 .setNegativeButton("ยกเลิก", null).show()
+        }
+
+        section("การติดตาม")
+        item("นำเข้าการติดตาม", "จากไฟล์ NewPipe (.json) หรือ subscriptions.csv จาก Google Takeout") { importPicker.launch(arrayOf("*/*")) }
+        item("ส่งออกการติดตาม", "บันทึกช่องที่ติดตามอยู่ ${Subs.count()} ช่อง เป็นไฟล์ .json (นำเข้ากลับได้ทั้ง YT Classic และ NewPipe)") {
+            exportPicker.launch(SubsFormat.exportFileName(java.time.LocalDate.now()))
         }
 
         section("ฟีดและเนื้อหา")
