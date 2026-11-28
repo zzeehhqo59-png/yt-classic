@@ -72,7 +72,7 @@ object Playback {
     private var appVisible = true
     /** Playing a downloaded file (no network, no re-fetch on errors). */
     var offline = false; private set
-    private var offlineFile: java.io.File? = null
+    private var offlineUri: android.net.Uri? = null
 
     val player: ExoPlayer by lazy {
         ExoPlayer.Builder(app)
@@ -239,7 +239,7 @@ object Playback {
         _state.value.item?.let { if (it.url != item.url && !goingBack) { back.add(it); if (back.size > 50) back.removeAt(0) } }
         savePosition()
         loadJob?.cancel()
-        retries = 0; offline = false; offlineFile = null
+        retries = 0; offline = false; offlineUri = null
         player.stop(); player.clearMediaItems()
         qualities = emptyList(); current = -1; subtitles = emptyList(); audioTracks = emptyList(); currentAudio = null; live = false
         _state.value = State(item = item, loading = true)
@@ -320,21 +320,21 @@ object Playback {
     }
 
     fun retry() {
-        val f = offlineFile
-        _state.value.item?.let { if (offline && f != null) openFile(it, f) else { _state.value = _state.value.copy(error = "x"); open(it) } }
+        val u = offlineUri
+        _state.value.item?.let { if (offline && u != null) openFile(it, u) else { _state.value = _state.value.copy(error = "x"); open(it) } }
     }
 
     /** Play a downloaded file (คลังวิดีโอ > การดาวน์โหลด) with the same player, offline. */
-    fun openFile(item: VideoItem, file: java.io.File) {
+    fun openFile(item: VideoItem, uri: android.net.Uri) {
         savePosition()
         loadJob?.cancel()
         retries = 0
         player.stop(); player.clearMediaItems()
-        offline = true; offlineFile = file
+        offline = true; offlineUri = uri
         live = false; subtitles = emptyList(); audioTracks = emptyList(); currentAudio = null
         cancelAutoplay()
         val factory = ProgressiveMediaSource.Factory(com.google.android.exoplayer2.upstream.DefaultDataSource.Factory(app))
-        qualities = listOf(Quality("ไฟล์ที่ดาวน์โหลด", 0) { factory.createMediaSource(MediaItem.fromUri(android.net.Uri.fromFile(file))) })
+        qualities = listOf(Quality("ไฟล์ที่ดาวน์โหลด", 0) { factory.createMediaSource(MediaItem.fromUri(uri)) })
         current = 0
         _state.value = State(item = item, loading = true)
         History.record(item)
@@ -350,7 +350,7 @@ object Playback {
         savePosition()
         back.clear()
         PlayQueue.clear()
-        offline = false; offlineFile = null
+        offline = false; offlineUri = null
         audioTracks = emptyList(); currentAudio = null
         loadJob?.cancel()
         player.stop(); player.clearMediaItems()

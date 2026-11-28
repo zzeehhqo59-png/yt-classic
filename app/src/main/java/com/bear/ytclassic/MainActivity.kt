@@ -74,9 +74,9 @@ class MainActivity : YtActivity() {
 
 /** Play a finished download offline in the app player. */
 fun android.content.Context.openDownloaded(d: Downloads.Dl) {
-    val f = d.file?.let { java.io.File(it) }
-    if (f == null || !f.exists()) { Toast.makeText(this, "ไม่พบไฟล์ที่ดาวน์โหลดไว้ (อาจถูกลบไปแล้ว)", Toast.LENGTH_SHORT).show(); return }
-    WatchNav.open(this, d.video(), file = f)
+    if (!DeviceSave.exists(this, d.file)) { Toast.makeText(this, "ไม่พบไฟล์ที่ดาวน์โหลดไว้ (อาจถูกลบไปแล้ว)", Toast.LENGTH_SHORT).show(); return }
+    val uri = DeviceSave.playUri(d.file) ?: return
+    WatchNav.open(this, d.video(), uri = uri)
 }
 
 fun android.content.Context.openVideo(v: VideoItem, expandFrom: Float = -1f) {

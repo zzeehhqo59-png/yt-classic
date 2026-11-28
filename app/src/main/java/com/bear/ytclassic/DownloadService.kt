@@ -143,11 +143,11 @@ class DownloadService : Service() {
                     progressNotif(d0, total, total, merging = true)
                     val ext = if (audioOnly) "m4a" else "mp4"
                     // same name on retry: overwrite this download's own partial file instead of making "(2)"
-                    val nameBase = safeName(d0.title) + (if (audioOnly) "" else " (${d0.height}p)")
+                    val nameBase = DeviceSave.safeName(d0.title) + (if (audioOnly) "" else " (${d0.height}p)")
                     val target = File(Downloads.dir(ctx), "$nameBase.$ext")
                     val taken = Downloads.all().any { it.id != d0.id && it.file == target.path }
                     val out = if (taken) unique(Downloads.dir(ctx), nameBase, ext) else target
-                    Downloads.get(d0.id)?.file?.let { old -> if (old != out.path) File(old).delete() }
+                    Downloads.get(d0.id)?.file?.let { old -> if (old != out.path) DeviceSave.removeStored(ctx, old) }
                     out.delete()
                     Downloads.update(d0.id) { put("file", out.path) }
                     val inputs = jobs.map { it.second }
@@ -157,8 +157,16 @@ class DownloadService : Service() {
                         if (inputs.size == 1) inputs[0].copyTo(out, overwrite = true) else throw IllegalStateException("รวมวิดีโอกับเสียงไม่สำเร็จ")
                     }
                     inputs.forEach { it.delete() }
-                    Downloads.update(d0.id) { put("status", Downloads.DONE); put("file", out.path); put("total_bytes", out.length()); put("done_bytes", out.length()); put("error", null as String?) }
-                    finished(d0, true, "ดาวน์โหลดเสร็จแล้ว · ${d0.quality} · ${Downloads.mb(out.length())}")
+                    val size = out.length()
+                    var stored = out.path
+                    if (Prefs.saveToDevice) {
+                        val publicTaken = DeviceSave.takenNames(ctx, audioOnly)
+                        val fileName = DeviceSave.displayName(d0.title, audioOnly, d0.height, publicTaken)
+                        val uri = DeviceSave.publishNamed(ctx, out, DeviceSave.Meta(d0.title, d0.channel, audioOnly, d0.durationSec * 1000, publicTaken), fileName)
+                        if (uri != null) { out.delete(); stored = uri.toString() }
+                    }
+                    Downloads.update(d0.id) { put("status", Downloads.DONE); put("file", stored); put("total_bytes", size); put("done_bytes", size); put("error", null as String?) }
+                    finished(d0, true, "ดาวน์โหลดเสร็จแล้ว · ${d0.quality} · ${Downloads.mb(size)}")
                     return
                 } catch (e: CancellationException) { throw e
                 } catch (e: Throwable) {
@@ -228,7 +236,6 @@ class DownloadService : Service() {
         }
     }
 
-    private fun safeName(s: String) = s.replace(Regex("[\\\\/:*?\"<>|\\n\\r\\t]"), " ").trim().take(80).ifBlank { "video" }
     private fun unique(dir: File, base: String, ext: String): File {
         var f = File(dir, "$base.$ext"); var i = 2
         while (f.exists()) { f = File(dir, "$base ($i).$ext"); i++ }

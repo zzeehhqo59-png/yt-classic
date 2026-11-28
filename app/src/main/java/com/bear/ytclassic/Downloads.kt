@@ -22,7 +22,7 @@ import org.schabi.newpipe.extractor.stream.StreamInfo
 import org.schabi.newpipe.extractor.stream.VideoStream
 import java.io.File
 
-/** Downloaded / downloading videos (table "downloads"), files in app storage: Android/data/<app>/files/Download/YT Classic. */
+/** Downloaded / downloading videos (table "downloads"). Temp files stay in the app folder; finished files go to Music/Movies when Prefs.saveToDevice is on (path or content Uri in [Dl.file]). */
 object Downloads {
     const val QUEUED = 0; const val RUNNING = 1; const val PAUSED = 2; const val DONE = 3; const val FAILED = 4; const val MERGING = 5
 
@@ -70,7 +70,7 @@ object Downloads {
 
     /** Removes the entry and its files (finished file too). */
     fun delete(c: Context, id: Long) {
-        get(id)?.file?.let { File(it).delete() }
+        get(id)?.file?.let { DeviceSave.removeStored(c, it) }
         parts(c, id).forEach { it.delete() }
         Db.w.delete("downloads", "id=?", arrayOf("$id")); bump()
     }
@@ -157,6 +157,9 @@ object Downloads {
     /** Download button / ⋮ menu: pick quality (or use the defaults from Settings) and queue it. */
     fun start(c: Context, v: VideoItem, known: StreamInfo? = null) {
         if (v.kind != 0 || v.live) { Toast.makeText(c, "ดาวน์โหลดได้เฉพาะวิดีโอทั่วไป (ไม่รวมไลฟ์สด)", Toast.LENGTH_SHORT).show(); return }
+        if (Prefs.saveToDevice && DeviceSave.needsLegacyWrite() && !DeviceSave.hasLegacyWrite(c)) {
+            (c as? android.app.Activity)?.let { DeviceSave.requestLegacyWrite(it) }
+        }
         val wait = if (known == null) AlertDialog.Builder(c).setMessage("กำลังโหลดตัวเลือกการดาวน์โหลด…").setCancelable(true).show() else null
         val launcher: CoroutineScope = (c as? androidx.lifecycle.LifecycleOwner)?.lifecycleScope ?: MainScope()
         launcher.launch {

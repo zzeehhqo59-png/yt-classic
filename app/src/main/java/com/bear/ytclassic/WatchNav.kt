@@ -3,6 +3,7 @@ package com.bear.ytclassic
 import android.app.Activity
 import android.content.Context
 import android.content.Intent
+import android.net.Uri
 import androidx.appcompat.app.AppCompatActivity
 import java.io.File
 
@@ -26,14 +27,15 @@ object WatchNav {
 
     fun opensCommentsOnCollapse(): Boolean = false
 
-    fun open(ctx: Context, item: VideoItem, file: File? = null, expandFrom: Float = -1f) {
+    fun open(ctx: Context, item: VideoItem, file: File? = null, expandFrom: Float = -1f, uri: Uri? = null) {
+        val local = uri ?: file?.let { Uri.fromFile(it) }
         val a = ctx as? AppCompatActivity
-        if (a != null) { WatchLayer.attach(a).open(item, file, expandFrom); return }
+        if (a != null) { WatchLayer.attach(a).open(item, local, expandFrom); return }
         ctx.startActivity(
             Intent(ctx, MainActivity::class.java)
                 .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP)
                 .putExtra(WatchActivity.EXTRA_ITEM, item)
-                .putExtra(WatchActivity.EXTRA_FILE, file?.path)
+                .putExtra(WatchActivity.EXTRA_FILE, local?.toString())
                 .putExtra(WatchActivity.EXTRA_EXPAND_FROM, expandFrom),
         )
     }
@@ -43,12 +45,12 @@ object WatchNav {
         val expandCurrent = intent.getBooleanExtra(WatchActivity.EXTRA_EXPAND_CURRENT, false)
         @Suppress("DEPRECATION")
         val item = intent.getSerializableExtra(WatchActivity.EXTRA_ITEM) as? VideoItem
-        val file = intent.getStringExtra(WatchActivity.EXTRA_FILE)?.let { File(it) }
+        val local = DeviceSave.playUri(intent.getStringExtra(WatchActivity.EXTRA_FILE))
         val from = intent.getFloatExtra(WatchActivity.EXTRA_EXPAND_FROM, -1f)
         if (item == null && !expandCurrent) return
         intent.removeExtra(WatchActivity.EXTRA_ITEM)
         intent.removeExtra(WatchActivity.EXTRA_EXPAND_CURRENT)
-        WatchLayer.attach(a).open(item, file, from)
+        WatchLayer.attach(a).open(item, local, from)
     }
 
     fun revealFromIntent(starter: Activity, intent: Intent) {

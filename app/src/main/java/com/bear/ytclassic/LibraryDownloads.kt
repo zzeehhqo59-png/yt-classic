@@ -70,6 +70,7 @@ class LibraryDownloads(private val ctx: Context, private val box: LinearLayout) 
             Downloads.PAUSED -> add("ดาวน์โหลดต่อ") { DownloadService.send(ctx, DownloadService.ACTION_START, d.id) }
             Downloads.FAILED -> add("ลองอีกครั้ง") { DownloadService.send(ctx, DownloadService.ACTION_START, d.id) }
         }
+        if (DeviceSave.canExport(d.status, d.file)) add("บันทึกลงเครื่อง") { DeviceSave.exportFromMenu(ctx, d) }
         if (d.status == Downloads.DONE) add("ลบไฟล์ที่ดาวน์โหลด") {
             AlertDialog.Builder(ctx).setMessage("ลบ \"${d.title}\" ออกจากเครื่องใช่ไหม")
                 .setPositiveButton("ลบ") { _, _ -> Downloads.delete(ctx, d.id) }.setNegativeButton("ยกเลิก", null).show()

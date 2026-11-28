@@ -29,7 +29,7 @@ import com.google.android.exoplayer2.Player
 import com.google.android.exoplayer2.ui.StyledPlayerView
 import kotlinx.coroutines.launch
 import org.schabi.newpipe.extractor.stream.StreamInfo
-import java.io.File
+import android.net.Uri
 import java.lang.ref.WeakReference
 
 /**
@@ -169,8 +169,8 @@ class WatchLayer private constructor(private val a: AppCompatActivity, private v
         applyLayout(a.resources.configuration)
     }
 
-    fun open(item: VideoItem?, file: File?, expandFrom: Float) {
-        val opened = WatchOpen.planOpen(item, file) ?: return
+    fun open(item: VideoItem?, uri: Uri?, expandFrom: Float) {
+        val opened = WatchOpen.planOpen(item, uri) ?: return
         hideOthers(this)
         val v = opened.first
         val kind = opened.second
@@ -189,7 +189,7 @@ class WatchLayer private constructor(private val a: AppCompatActivity, private v
             }
             WatchViewModel.OpenKind.Unchanged -> {}
         }
-        WatchOpen.applyOpen(v, file, kind)
+        WatchOpen.applyOpen(v, uri, kind)
         list.scrollToPosition(0)
         show(expandFrom)
     }

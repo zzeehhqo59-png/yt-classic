@@ -1,5 +1,7 @@
 package com.bear.ytclassic
 
+import android.net.Uri
+
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import kotlinx.coroutines.flow.SharingStarted
@@ -7,7 +9,6 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import org.schabi.newpipe.extractor.stream.StreamInfo
-import java.io.File
 
 /** Immutable watch-page state derived from [Playback]. */
 data class WatchUiState(
@@ -36,9 +37,9 @@ class WatchViewModel : ViewModel() {
      * @return the item to show and how the page should bind, or null if there is nothing to show
      */
     /** Decide how to open without touching the player yet, so the Activity can reset the UI first. */
-    fun planOpen(item: VideoItem?, file: File?): Pair<VideoItem, OpenKind>? = WatchOpen.planOpen(item, file)
+    fun planOpen(item: VideoItem?, uri: Uri?): Pair<VideoItem, OpenKind>? = WatchOpen.planOpen(item, uri)
 
-    fun applyOpen(item: VideoItem, file: File?, kind: OpenKind) = WatchOpen.applyOpen(item, file, kind)
+    fun applyOpen(item: VideoItem, uri: Uri?, kind: OpenKind) = WatchOpen.applyOpen(item, uri, kind)
 
     /** Toggle 👍 / 👎 and return the toast to show. */
     fun rate(item: VideoItem, value: Int): String {
@@ -51,20 +52,20 @@ class WatchViewModel : ViewModel() {
 }
 
 object WatchOpen {
-    fun planOpen(item: VideoItem?, file: File?): Pair<VideoItem, WatchViewModel.OpenKind>? {
+    fun planOpen(item: VideoItem?, uri: Uri?): Pair<VideoItem, WatchViewModel.OpenKind>? {
         val v = item ?: Playback.state.value.item ?: return null
         val kind = when {
-            file != null && (Playback.state.value.item?.url != v.url || !Playback.offline) -> WatchViewModel.OpenKind.NewFile
-            file != null -> WatchViewModel.OpenKind.Unchanged
+            uri != null && (Playback.state.value.item?.url != v.url || !Playback.offline) -> WatchViewModel.OpenKind.NewFile
+            uri != null -> WatchViewModel.OpenKind.Unchanged
             Playback.state.value.item?.url == v.url -> WatchViewModel.OpenKind.Reuse
             else -> WatchViewModel.OpenKind.NewStream
         }
         return v to kind
     }
 
-    fun applyOpen(item: VideoItem, file: File?, kind: WatchViewModel.OpenKind) {
+    fun applyOpen(item: VideoItem, uri: Uri?, kind: WatchViewModel.OpenKind) {
         when (kind) {
-            WatchViewModel.OpenKind.NewFile -> if (file != null) Playback.openFile(item, file)
+            WatchViewModel.OpenKind.NewFile -> if (uri != null) Playback.openFile(item, uri)
             WatchViewModel.OpenKind.NewStream -> Playback.open(item)
             WatchViewModel.OpenKind.Reuse, WatchViewModel.OpenKind.Unchanged -> {}
         }

@@ -227,6 +227,8 @@ object Prefs {
     var dlQuality: Int get() = p.getInt("dl_quality", 720); set(v) = p.edit().putInt("dl_quality", v).apply()
     var dlAudioOnly: Boolean get() = b("dl_audio", false); set(v) = setB("dl_audio", v)
     var dlAsk: Boolean get() = b("dl_ask", true); set(v) = setB("dl_ask", v)
+    /** Save finished downloads into Music/Movies (default on). Off = app-private folder. */
+    var saveToDevice: Boolean get() = b("save_to_device", true); set(v) = setB("save_to_device", v)
     /** Captions: on/off, last language tag (blank = auto), font size (0/1/2). */
     var ccEnabled: Boolean get() = b("cc_on", false); set(v) = setB("cc_on", v)
     var ccLanguage: String

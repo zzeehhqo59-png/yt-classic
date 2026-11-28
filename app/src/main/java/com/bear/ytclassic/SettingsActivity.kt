@@ -106,10 +106,19 @@ class SettingsActivity : YtActivity() {
         }
         switch("ดาวน์โหลดเฉพาะเสียง", "เลือกไฟล์เสียง (m4a) เป็นค่าเริ่มต้น เหมาะกับเพลงและพอดแคสต์", Prefs.dlAudioOnly) { Prefs.dlAudioOnly = it }
         switch("ถามคุณภาพทุกครั้ง", "แสดงตัวเลือกคุณภาพก่อนเริ่มดาวน์โหลด", Prefs.dlAsk) { Prefs.dlAsk = it }
+        switch("บันทึกลงเครื่อง", "เสียงไปที่ Music/YT Classic วิดีโอไปที่ Movies/YT Classic — แอปเพลงและแกลเลอรีเห็นได้ และไฟล์ยังอยู่หลังถอนการติดตั้งแอป", Prefs.saveToDevice) {
+            if (it && DeviceSave.needsLegacyWrite() && !DeviceSave.hasLegacyWrite(this)) DeviceSave.requestLegacyWrite(this)
+            Prefs.saveToDevice = it
+            build()
+        }
         val dir = Downloads.dir(this).path
-        item("ตำแหน่งที่บันทึก", dir.substringAfter("/emulated/0/").let { if (it == dir) dir else "ที่เก็บข้อมูลภายใน/$it" }) {
+        val where = if (Prefs.saveToDevice)
+            "เสียง: Music/YT Classic\nวิดีโอ: Movies/YT Classic\nแอปเพลงและแกลเลอรีเห็นได้ และไฟล์ยังอยู่หลังถอนการติดตั้งแอป"
+        else
+            "พื้นที่ของแอปนี้:\n\n$dir\n\nดูได้ที่ แท็บคุณ > การดาวน์โหลด\nไฟล์จะถูกลบเมื่อถอนการติดตั้งแอป"
+        item("ตำแหน่งที่บันทึก", if (Prefs.saveToDevice) "Music/YT Classic และ Movies/YT Classic" else dir.substringAfter("/emulated/0/").let { if (it == dir) dir else "ที่เก็บข้อมูลภายใน/$it" }) {
             AlertDialog.Builder(this).setTitle("ตำแหน่งที่บันทึก")
-                .setMessage("ไฟล์ที่ดาวน์โหลดเก็บไว้ในพื้นที่ของแอปนี้:\n\n$dir\n\nดูแบบออฟไลน์ได้ที่ แท็บคุณ > การดาวน์โหลด\nไฟล์จะถูกลบเมื่อถอนการติดตั้งแอป")
+                .setMessage(where)
                 .setPositiveButton("ตกลง", null).show()
         }
 
